@@ -1,0 +1,1382 @@
+<!DOCTYPE html>
+<html lang="he" dir="rtl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
+<title>פתרונות פריים לדג'ר — פורטל לקוחות</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<style>
+/* ═══════════════════════════════════════
+   RESET & ROOT
+═══════════════════════════════════════ */
+*{box-sizing:border-box;margin:0;padding:0}
+:root{
+  --bg:#0b0f17;
+  --surface:#111827;
+  --card:#1a2234;
+  --card2:#1e2840;
+  --border:#2d3748;
+  --accent:#10b981;
+  --red:#ef4444;
+  --yellow:#f59e0b;
+  --blue2:#3b82f6;
+  --purple:#8b5cf6;
+  --brand:#1e5fa8;
+  --brand2:#2563eb;
+  --text:#f1f5f9;
+  --muted:#64748b;
+  --muted2:#94a3b8;
+  --biz:#3b82f6;
+  --priv:#8b5cf6;
+}
+body{background:var(--bg);color:var(--text);font-family:'Segoe UI','Noto Sans Hebrew',Arial,sans-serif;direction:rtl;font-size:14px;min-height:100vh}
+
+/* ═══════════════════════════════════════
+   AUTH SCREEN
+═══════════════════════════════════════ */
+#auth-screen{
+  display:flex;align-items:center;justify-content:center;
+  min-height:100vh;padding:20px;
+  background:radial-gradient(ellipse at 70% 20%, #1e3a5f33 0%, transparent 60%),
+             radial-gradient(ellipse at 20% 80%, #10b98111 0%, transparent 50%),
+             var(--bg);
+}
+.auth-box{
+  background:var(--card);border:1px solid var(--border);border-radius:16px;
+  padding:36px 32px;width:100%;max-width:420px;
+  box-shadow:0 25px 60px #00000055;
+}
+.auth-logo{text-align:center;margin-bottom:28px}
+.auth-logo-img{
+  width:64px;height:64px;object-fit:contain;border-radius:12px;
+  margin-bottom:10px;display:block;margin-left:auto;margin-right:auto;
+}
+.auth-brand{color:var(--brand);font-size:17px;font-weight:900;letter-spacing:-0.3px}
+.auth-sub{color:var(--muted2);font-size:11px;margin-top:3px}
+.auth-tabs{display:flex;border-radius:8px;overflow:hidden;border:1px solid var(--border);margin-bottom:22px}
+.auth-tab{flex:1;padding:9px;border:none;background:transparent;color:var(--muted2);cursor:pointer;font-size:13px;font-weight:600;transition:.2s}
+.auth-tab.active{background:var(--brand);color:#fff}
+.auth-form-label{color:var(--muted2);font-size:11px;margin-bottom:4px;display:block}
+.auth-input{
+  width:100%;background:var(--surface);border:1px solid var(--border);
+  border-radius:8px;color:var(--text);padding:10px 12px;font-size:13px;
+  outline:none;direction:rtl;font-family:inherit;margin-bottom:13px;transition:.2s;
+}
+.auth-input:focus{border-color:var(--brand);box-shadow:0 0 0 3px #1e5fa820}
+.auth-btn{
+  width:100%;padding:11px;border-radius:8px;border:none;
+  background:linear-gradient(135deg,var(--brand),var(--brand2));
+  color:#fff;cursor:pointer;font-size:14px;font-weight:700;
+  letter-spacing:.3px;transition:.2s;margin-top:4px;
+}
+.auth-btn:hover{opacity:.9;transform:translateY(-1px)}
+.auth-error{background:#ef444418;border:1px solid #ef444440;border-radius:6px;padding:8px 12px;font-size:12px;color:var(--red);margin-bottom:10px;display:none}
+.auth-info{background:#1e5fa815;border:1px solid #1e5fa840;border-radius:6px;padding:8px 12px;font-size:12px;color:#60a5fa;margin-bottom:10px;display:none}
+
+/* ═══════════════════════════════════════
+   PORTAL (after login)
+═══════════════════════════════════════ */
+#portal-screen{display:none;min-height:100vh;flex-direction:column}
+#portal-screen.visible{display:flex}
+
+/* Portal top header */
+#portal-header{
+  background:var(--surface);border-bottom:1px solid var(--border);
+  padding:0 16px;height:56px;display:flex;align-items:center;gap:10px;
+  position:sticky;top:0;z-index:300;
+}
+#portal-header-logo{display:flex;align-items:center;gap:8px}
+#portal-header-logo img{height:34px;width:34px;object-fit:contain;border-radius:6px}
+#portal-header-brand{color:var(--brand);font-weight:900;font-size:13px;white-space:nowrap}
+#portal-header-spacer{flex:1}
+#portal-user-info{
+  display:flex;align-items:center;gap:10px;
+  color:var(--muted2);font-size:12px;
+}
+#portal-user-avatar{
+  width:32px;height:32px;border-radius:50%;background:linear-gradient(135deg,var(--brand),var(--brand2));
+  display:flex;align-items:center;justify-content:center;
+  font-weight:700;font-size:13px;color:#fff;flex-shrink:0;
+}
+.portal-logout-btn{
+  padding:5px 11px;border-radius:6px;border:1px solid var(--border);
+  background:transparent;color:var(--muted2);cursor:pointer;font-size:11px;
+  transition:.2s;
+}
+.portal-logout-btn:hover{border-color:var(--red);color:var(--red)}
+
+/* Portal sidebar + content */
+#portal-body{display:flex;flex:1;overflow:hidden}
+#portal-sidebar{
+  width:200px;background:var(--surface);border-left:1px solid var(--border);
+  padding:16px 10px;flex-shrink:0;overflow-y:auto;
+}
+#portal-content{flex:1;overflow-y:auto;padding:16px}
+@media(max-width:640px){
+  #portal-body{flex-direction:column}
+  #portal-sidebar{width:100%;border-left:none;border-bottom:1px solid var(--border);padding:8px;display:flex;flex-wrap:wrap;gap:4px}
+}
+
+/* Sidebar nav */
+.sidebar-section{color:var(--muted);font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.8px;margin:12px 8px 5px;padding-bottom:4px;border-bottom:1px solid var(--border)}
+.sidebar-section:first-child{margin-top:0}
+.side-btn{
+  display:flex;align-items:center;gap:8px;width:100%;padding:8px 10px;
+  border-radius:7px;border:none;background:transparent;color:var(--muted2);
+  cursor:pointer;font-size:12px;font-weight:500;text-align:right;direction:rtl;
+  transition:.15s;margin-bottom:2px;
+}
+.side-btn:hover{background:var(--card);color:var(--text)}
+.side-btn.active{background:#1e5fa820;color:var(--brand);font-weight:700}
+.side-btn .side-icon{font-size:15px;flex-shrink:0}
+.side-btn .side-badge{
+  margin-right:auto;background:var(--red);color:#fff;font-size:9px;
+  font-weight:700;padding:1px 5px;border-radius:10px;
+}
+
+/* Welcome card */
+.welcome-card{
+  background:linear-gradient(135deg,#1a3a6b,#1e2840);
+  border:1px solid #2d3748;border-radius:12px;padding:20px;
+  margin-bottom:16px;position:relative;overflow:hidden;
+}
+.welcome-card::before{
+  content:'';position:absolute;top:-30px;left:-30px;
+  width:150px;height:150px;border-radius:50%;
+  background:radial-gradient(circle,#1e5fa820 0%,transparent 70%);
+}
+.welcome-title{font-size:18px;font-weight:800;margin-bottom:4px}
+.welcome-sub{color:var(--muted2);font-size:12px}
+.welcome-stats{display:flex;gap:12px;margin-top:14px;flex-wrap:wrap}
+.welcome-stat{background:#ffffff0a;border-radius:8px;padding:8px 14px;flex:1;min-width:100px}
+.welcome-stat-val{font-size:16px;font-weight:800;color:var(--accent)}
+.welcome-stat-lbl{font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:.5px;margin-top:2px}
+
+/* Tab panels inside portal */
+.portal-tab{display:none}
+.portal-tab.active{display:block}
+
+/* Coming-soon placeholder */
+.coming-soon{
+  background:var(--card);border:2px dashed var(--border);border-radius:12px;
+  padding:48px 24px;text-align:center;
+}
+.coming-soon-icon{font-size:40px;margin-bottom:12px}
+.coming-soon h3{font-size:16px;font-weight:700;margin-bottom:6px}
+.coming-soon p{color:var(--muted2);font-size:13px}
+.coming-soon-badge{
+  display:inline-block;background:#f59e0b20;color:var(--yellow);
+  border:1px solid #f59e0b40;border-radius:20px;padding:3px 12px;
+  font-size:11px;font-weight:700;margin-top:12px;
+}
+
+/* ═══════════════════════════════════════
+   FINANCIAL TOOL (embedded inside portal)
+═══════════════════════════════════════ */
+#fin-tool{background:transparent}
+#fin-tool *{box-sizing:border-box}
+
+/* topbar within tool */
+#fin-topbar{
+  background:var(--card);border:1px solid var(--border);border-radius:10px;
+  padding:0 8px;display:flex;align-items:center;height:44px;gap:2px;
+  overflow-x:auto;margin-bottom:12px;
+}
+#fin-topbar::-webkit-scrollbar{display:none}
+.navbtn{padding:5px 10px;border-radius:6px;border:none;cursor:pointer;font-size:11px;background:transparent;color:var(--muted2);white-space:nowrap;font-weight:500}
+.navbtn.active{background:#10b98120;color:var(--accent);font-weight:700}
+
+/* fin tab panels */
+.tab-panel{display:none}.tab-panel.active{display:block}
+.card{background:var(--card);border:1px solid var(--border);border-radius:10px;padding:14px;margin-bottom:12px}
+.card2{background:var(--card2);border:1px solid var(--border);border-radius:8px;padding:10px;margin-bottom:6px}
+.sec-title{font-size:13px;font-weight:700;margin-bottom:10px;padding-bottom:8px;border-bottom:1px solid var(--border);display:flex;justify-content:space-between;align-items:center;gap:6px;flex-wrap:wrap}
+.kpi-grid{display:grid;grid-template-columns:repeat(2,1fr);gap:8px;margin-bottom:12px}
+@media(min-width:560px){.kpi-grid{grid-template-columns:repeat(4,1fr)}}
+.kpi{border-radius:10px;padding:11px 13px;background:var(--card);border:1px solid var(--border)}
+.kpi-lbl{color:var(--muted);font-size:10px;text-transform:uppercase;letter-spacing:.6px;margin-bottom:3px}
+.kpi-val{font-size:16px;font-weight:800}
+.kpi-sub{font-size:10px;color:var(--muted);margin-top:2px}
+.tbl{width:100%;border-collapse:collapse;font-size:12px}
+.tbl th{background:var(--surface);padding:6px 8px;text-align:right;color:var(--muted);font-size:10px;font-weight:600;text-transform:uppercase;border-bottom:1px solid var(--border)}
+.tbl td{padding:6px 8px;border-bottom:1px solid #2d374822;vertical-align:middle}
+.tbl-wrap{overflow-x:auto}
+.badge{display:inline-block;padding:2px 7px;border-radius:20px;font-size:10px;font-weight:700}
+.bg{background:#10b98120;color:var(--accent)}.br{background:#ef444420;color:var(--red)}
+.by{background:#f59e0b20;color:var(--yellow)}.bb{background:#3b82f620;color:var(--blue2)}.bp{background:#8b5cf620;color:var(--purple)}
+.b-dup{background:#ef444430;color:#ff6b6b;border:1px solid #ef444460}
+.btn{padding:6px 13px;border-radius:6px;border:1px solid var(--accent);background:#10b98115;color:var(--accent);cursor:pointer;font-size:12px;font-weight:600;white-space:nowrap}
+.btn-solid{padding:7px 16px;border-radius:6px;border:none;background:var(--accent);color:#0b0f17;cursor:pointer;font-size:13px;font-weight:700}
+.btn-red{border-color:var(--red);background:#ef444415;color:var(--red)}
+.btn-blue{border-color:var(--blue2);background:#3b82f615;color:var(--blue2)}
+.btn-sm{padding:3px 8px;font-size:11px}
+.btn-match{padding:4px 10px;border-radius:5px;border:none;background:#10b98125;color:var(--accent);cursor:pointer;font-size:11px;font-weight:700;width:100%;margin-top:5px;border:1px solid #10b98140}
+.btn-match:hover{background:#10b98140}
+.btn-add-rec{padding:4px 10px;border-radius:5px;border:1px solid #f59e0b40;background:#f59e0b15;color:var(--yellow);cursor:pointer;font-size:11px;font-weight:700;width:100%;margin-top:3px}
+.print-bar{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:10px}
+input,select{background:var(--surface);border:1px solid var(--border);border-radius:6px;color:var(--text);padding:6px 9px;font-size:13px;outline:none;width:100%;direction:rtl;font-family:inherit}
+input:focus,select:focus{border-color:var(--accent)}
+.form-label{color:var(--muted);font-size:11px;margin-bottom:3px}
+.form-grid{display:grid;gap:8px;margin-bottom:8px}
+#dropzone{border:2px dashed var(--border);border-radius:10px;padding:24px 14px;text-align:center;background:var(--surface);cursor:pointer;transition:.2s;margin-bottom:12px}
+#dropzone:hover,#dropzone.drag{border-color:var(--accent);background:#10b98108}
+.type-toggle{display:flex;border-radius:8px;overflow:hidden;border:1px solid var(--border)}
+.type-btn{padding:6px 17px;border:none;cursor:pointer;font-size:13px;font-weight:600;background:transparent;color:var(--muted2)}
+.type-btn.out.active{background:#ef444420;color:var(--red)}
+.type-btn.in.active{background:#10b98120;color:var(--accent)}
+.bp-toggle{display:flex;border-radius:8px;overflow:hidden;border:1px solid var(--border)}
+.bp-btn{padding:6px 14px;border:none;cursor:pointer;font-size:12px;font-weight:600;background:transparent;color:var(--muted2)}
+.bp-btn.biz.active{background:#3b82f620;color:var(--biz)}
+.bp-btn.priv.active{background:#8b5cf620;color:var(--purple)}
+.period-bar{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:10px;align-items:center}
+.period-btn{padding:4px 11px;border-radius:6px;border:1px solid var(--border);background:transparent;color:var(--muted2);cursor:pointer;font-size:12px}
+.period-btn.active{border-color:var(--accent);background:#10b98115;color:var(--accent);font-weight:700}
+.inner-tabs{display:flex;gap:6px;margin-bottom:12px;flex-wrap:wrap}
+.itab{padding:5px 13px;border-radius:6px;border:1px solid var(--border);background:transparent;color:var(--muted2);cursor:pointer;font-size:12px;font-weight:500}
+.itab.active{border-color:var(--accent);background:#10b98115;color:var(--accent);font-weight:700}
+.itab.biz.active{border-color:var(--biz);background:#3b82f615;color:var(--biz)}
+.itab.priv.active{border-color:var(--purple);background:#8b5cf615;color:var(--purple)}
+.acct-bar{display:flex;gap:7px;flex-wrap:wrap;margin-bottom:10px;align-items:center}
+.acct-chip{padding:4px 11px;border-radius:20px;border:1px solid var(--border);background:transparent;color:var(--muted2);cursor:pointer;font-size:11px;font-weight:500;display:flex;align-items:center;gap:4px}
+.acct-chip.active{font-weight:700}
+.acct-chip.all.active{border-color:var(--accent);background:#10b98115;color:var(--accent)}
+.acct-chip.bank.active{border-color:var(--blue2);background:#3b82f615;color:var(--blue2)}
+.acct-chip.cc.active{border-color:var(--purple);background:#8b5cf615;color:var(--purple)}
+.acct-dot{width:6px;height:6px;border-radius:50%;display:inline-block}
+.cat-row{margin-bottom:8px}
+.cat-header{display:flex;justify-content:space-between;margin-bottom:3px;font-size:12px}
+.cat-bg{background:var(--surface);border-radius:4px;height:4px}
+.cat-fill{height:4px;border-radius:4px;transition:.4s}
+.bar-chart{display:flex;gap:5px;align-items:flex-end;height:120px;overflow-x:auto;padding-bottom:2px}
+.bar-col{display:flex;flex-direction:column;align-items:center;gap:2px;min-width:34px;flex:1}
+.bar-bars{display:flex;gap:2px;align-items:flex-end;height:90px}
+.bar{width:13px;border-radius:3px 3px 0 0;min-height:2px;transition:.4s}
+.bar-lbl{font-size:9px;color:var(--muted);white-space:nowrap}
+.bar-net{font-size:10px;font-weight:700}
+.modal-bg{display:none;position:fixed;inset:0;background:#00000088;z-index:500;align-items:center;justify-content:center}
+.modal-bg.open{display:flex}
+.modal{background:var(--card);border:1px solid var(--border);border-radius:12px;padding:18px;width:90%;max-width:400px}
+h2{font-size:16px;font-weight:800;margin-bottom:4px}
+.subtitle{color:var(--muted2);font-size:12px;margin-bottom:12px}
+.rec-split{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:12px}
+@media(max-width:640px){.rec-split{grid-template-columns:1fr}}
+.rec-col{background:var(--card);border:1px solid var(--border);border-radius:10px;display:flex;flex-direction:column}
+.rec-col-header{padding:10px 14px;border-bottom:1px solid var(--border);font-weight:700;font-size:13px;display:flex;justify-content:space-between;align-items:center;gap:6px}
+.rec-col-left{border-color:#3b82f640;border-top:2px solid var(--blue2)}
+.rec-col-right{border-color:#8b5cf640;border-top:2px solid var(--purple)}
+.rec-col-body{padding:10px;flex:1;overflow-y:auto;max-height:500px}
+.rec-item{border-radius:8px;padding:10px 12px;margin-bottom:7px;cursor:pointer;transition:.15s;border:2px solid transparent;position:relative}
+.rec-item-bank{background:#1e2840;border-color:#3b82f620}
+.rec-item-rec{background:#1e2840;border-color:#8b5cf620}
+.rec-item.selected{border-color:var(--accent)!important;background:#10b98112!important}
+.rec-item.matched-done{border-color:#10b98130;background:#10b98108;opacity:.7}
+.rec-item.dup-flag{border-color:#ef444460!important;background:#ef444412!important}
+.rec-item-amount{font-weight:800;font-size:14px}
+.rec-item-desc{font-size:12px;color:var(--text);margin-bottom:2px;font-weight:600}
+.rec-item-date{font-size:10px;color:var(--muted)}
+.rec-item-acct{font-size:10px;color:var(--muted2);margin-top:2px}
+.rec-item-actions{margin-top:7px;display:flex;flex-direction:column;gap:4px}
+.rec-match-zone{background:var(--surface);border:1px dashed var(--border);border-radius:8px;padding:10px;text-align:center;color:var(--muted);font-size:12px;margin-bottom:10px}
+.rec-stats{display:flex;gap:8px;flex-wrap:wrap;padding:8px 14px;border-top:1px solid var(--border);font-size:11px;color:var(--muted)}
+.rec-stats span{white-space:nowrap}
+.dup-banner{background:#ef444418;border:1px solid #ef444440;border-radius:8px;padding:10px 14px;margin-bottom:10px;font-size:12px}
+.dup-banner strong{color:var(--red)}
+@media print{
+  #auth-screen,#portal-header,#portal-sidebar,.print-bar,.no-print,button{display:none!important}
+  body{background:#fff!important;color:#000!important;font-size:11px}
+  .card,.card2,.rec-col{background:#fff!important;border:1px solid #ddd!important;}
+  .tbl th{background:#f0f0f0!important;color:#333!important}
+  .tbl td{color:#000!important}
+  #print-header{display:flex!important}
+  #print-footer{display:block!important}
+  .tab-panel{display:none!important}
+  .tab-panel.print-active{display:block!important}
+  #portal-content{padding:0!important}
+  .rec-col-body{max-height:none;overflow:visible}
+}
+#print-header{display:none;align-items:center;gap:14px;margin-bottom:12px;padding-bottom:10px;border-bottom:2px solid #1e5fa8}
+#print-header img{height:52px;width:52px;object-fit:contain}
+#print-header-text h1{font-size:15px;color:#1e5fa8;font-weight:900}
+#print-header-text .ph-sub{font-size:10px;color:#666}
+#print-header-text .ph-client{font-size:13px;font-weight:700;color:#1e5fa8;margin-top:3px}
+#print-header-text .ph-date{font-size:10px;color:#888}
+#print-footer{display:none;text-align:center;font-size:9px;color:#aaa;margin-top:14px;padding-top:6px;border-top:1px solid #ddd}
+
+/* ── LOGO base64 shared ── */
+</style>
+</head>
+<body>
+
+<!-- ══════════════════════════════════════
+     PRINT HEADER (shows only on print)
+══════════════════════════════════════ -->
+<div id="print-header">
+  <img src="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAfQAAAH0CAYAAADL1t+KAAAMnElEQVR42u3BMQEAAADCoPVP7WsIoAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAeAMBuAABHgAAAABJRU5ErkJggg==" alt="">
+  <div id="print-header-text">
+    <h1>פתרונות פריים לדג'ר</h1>
+    <div class="ph-sub">הנהלת חשבונות | חשבות שכר ופתרונות פיננסיים</div>
+    <div class="ph-client" id="ph-client"></div>
+    <div class="ph-date" id="ph-date"></div>
+  </div>
+</div>
+<div id="print-footer">נבנה ע"י פתרונות פריים לדג'ר | הנהלת חשבונות ופתרונות פיננסיים</div>
+
+<!-- ══════════════════════════════════════
+     AUTH SCREEN
+══════════════════════════════════════ -->
+<div id="auth-screen">
+  <div class="auth-box">
+    <div class="auth-logo">
+      <!-- Prime Ledger logo placeholder circle -->
+      <div style="width:64px;height:64px;background:linear-gradient(135deg,#1e5fa8,#2563eb);border-radius:14px;display:flex;align-items:center;justify-content:center;margin:0 auto 10px;font-size:28px">💼</div>
+      <div class="auth-brand">פתרונות פריים לדג'ר</div>
+      <div class="auth-sub">הנהלת חשבונות | פורטל לקוחות</div>
+    </div>
+
+    <div class="auth-tabs">
+      <button class="auth-tab active" onclick="showAuthTab('login',this)">כניסה</button>
+      <button class="auth-tab" onclick="showAuthTab('register',this)">הרשמה</button>
+    </div>
+
+    <!-- LOGIN -->
+    <div id="auth-login">
+      <div id="login-error" class="auth-error">שם משתמש או סיסמה שגויים</div>
+      <label class="auth-form-label">אימייל</label>
+      <input class="auth-input" type="email" id="login-email" placeholder="your@email.com" autocomplete="email">
+      <label class="auth-form-label">סיסמה</label>
+      <input class="auth-input" type="password" id="login-pass" placeholder="••••••••" autocomplete="current-password" onkeydown="if(event.key==='Enter')doLogin()">
+      <button class="auth-btn" onclick="doLogin()">כניסה לפורטל →</button>
+      <div style="text-align:center;margin-top:14px;font-size:11px;color:var(--muted)">
+        למנהל: <span style="color:var(--muted2)">admin@primeledger.co.il / Admin123!</span>
+      </div>
+    </div>
+
+    <!-- REGISTER -->
+    <div id="auth-register" style="display:none">
+      <div id="reg-error" class="auth-error"></div>
+      <div id="reg-info" class="auth-info"></div>
+      <label class="auth-form-label">שם מלא</label>
+      <input class="auth-input" type="text" id="reg-name" placeholder="ישראל ישראלי">
+      <label class="auth-form-label">שם עסק</label>
+      <input class="auth-input" type="text" id="reg-biz" placeholder="שם החברה / העסק">
+      <label class="auth-form-label">אימייל</label>
+      <input class="auth-input" type="email" id="reg-email" placeholder="your@email.com">
+      <label class="auth-form-label">סיסמה (לפחות 6 תווים)</label>
+      <input class="auth-input" type="password" id="reg-pass" placeholder="••••••••" onkeydown="if(event.key==='Enter')doRegister()">
+      <button class="auth-btn" onclick="doRegister()">הרשמה לפורטל →</button>
+    </div>
+  </div>
+</div>
+
+<!-- ══════════════════════════════════════
+     PORTAL SCREEN
+══════════════════════════════════════ -->
+<div id="portal-screen">
+
+  <!-- Header -->
+  <div id="portal-header">
+    <div id="portal-header-logo">
+      <div style="width:34px;height:34px;background:linear-gradient(135deg,#1e5fa8,#2563eb);border-radius:7px;display:flex;align-items:center;justify-content:center;font-size:16px">💼</div>
+      <div>
+        <div id="portal-header-brand">פריים לדג'ר</div>
+        <div style="color:var(--muted);font-size:9px">פורטל לקוחות</div>
+      </div>
+    </div>
+    <div id="portal-header-spacer"></div>
+    <div id="portal-user-info">
+      <div id="portal-user-avatar">?</div>
+      <div class="no-print">
+        <div id="portal-user-name" style="font-size:12px;font-weight:600;color:var(--text)"></div>
+        <div id="portal-user-biz" style="font-size:10px;color:var(--muted)"></div>
+      </div>
+      <button class="portal-logout-btn no-print" onclick="doLogout()">יציאה</button>
+    </div>
+  </div>
+
+  <!-- Body -->
+  <div id="portal-body">
+
+    <!-- Sidebar -->
+    <div id="portal-sidebar">
+      <div class="sidebar-section">ניהול פיננסי</div>
+      <button class="side-btn active" onclick="switchPortalTab('home',this)">
+        <span class="side-icon">🏠</span> ראשי
+      </button>
+      <button class="side-btn" onclick="switchPortalTab('cashflow',this)">
+        <span class="side-icon">💹</span> תזרים מזומנים
+      </button>
+      <div class="sidebar-section">בקרוב</div>
+      <button class="side-btn" onclick="switchPortalTab('pl',this)">
+        <span class="side-icon">📊</span> רווח והפסד
+        <span class="side-badge">בקרוב</span>
+      </button>
+      <button class="side-btn" onclick="switchPortalTab('balance',this)">
+        <span class="side-icon">⚖️</span> מאזן
+        <span class="side-badge">בקרוב</span>
+      </button>
+      <button class="side-btn" onclick="switchPortalTab('vat',this)">
+        <span class="side-icon">🧾</span> מע"מ
+        <span class="side-badge">בקרוב</span>
+      </button>
+      <button class="side-btn" onclick="switchPortalTab('salary',this)">
+        <span class="side-icon">👷</span> שכר
+        <span class="side-badge">בקרוב</span>
+      </button>
+    </div>
+
+    <!-- Main content -->
+    <div id="portal-content">
+
+      <!-- HOME TAB -->
+      <div id="ptab-home" class="portal-tab active">
+        <div class="welcome-card">
+          <div class="welcome-title" id="wc-title">שלום! 👋</div>
+          <div class="welcome-sub" id="wc-sub">ברוך הבא לפורטל הפיננסי שלך</div>
+          <div class="welcome-stats">
+            <div class="welcome-stat">
+              <div class="welcome-stat-val" id="ws-bal">₪0</div>
+              <div class="welcome-stat-lbl">יתרה נוכחית</div>
+            </div>
+            <div class="welcome-stat">
+              <div class="welcome-stat-val" id="ws-records" style="color:var(--blue2)">0</div>
+              <div class="welcome-stat-lbl">רישומים</div>
+            </div>
+            <div class="welcome-stat">
+              <div class="welcome-stat-val" id="ws-unmatched" style="color:var(--yellow)">0</div>
+              <div class="welcome-stat-lbl">לא מותאם</div>
+            </div>
+          </div>
+        </div>
+
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:12px">
+          <div class="card" style="cursor:pointer;transition:.2s;border-color:#1e5fa840" onclick="switchPortalTab('cashflow',document.querySelector('.side-btn:nth-child(3)'))" onmouseenter="this.style.borderColor='var(--brand)'" onmouseleave="this.style.borderColor='#1e5fa840'">
+            <div style="font-size:28px;margin-bottom:8px">💹</div>
+            <div style="font-weight:700;font-size:13px;margin-bottom:4px">תזרים מזומנים</div>
+            <div style="color:var(--muted2);font-size:11px">מעקב הוצאות, הכנסות, ייבוא מהבנק</div>
+          </div>
+          <div class="card" style="opacity:.6;cursor:not-allowed;border-style:dashed">
+            <div style="font-size:28px;margin-bottom:8px">📊</div>
+            <div style="font-weight:700;font-size:13px;margin-bottom:4px">רווח והפסד</div>
+            <div style="color:var(--muted2);font-size:11px">יגיע בקרוב...</div>
+            <div class="coming-soon-badge" style="margin-top:8px">בקרוב</div>
+          </div>
+        </div>
+
+        <div class="card">
+          <div class="sec-title">📣 עדכונים מהמשרד</div>
+          <div id="admin-messages">
+            <div style="color:var(--muted);font-size:12px;padding:8px 0">אין הודעות חדשות</div>
+          </div>
+        </div>
+
+        <div class="card" style="border-color:#1e5fa840">
+          <div class="sec-title" style="color:var(--brand)">📞 יצירת קשר</div>
+          <div style="font-size:12px;color:var(--muted2);line-height:1.8">
+            <div>📧 info@primeledger.co.il</div>
+            <div>📱 050-000-0000</div>
+            <div>🏢 פתרונות פריים לדג'ר — הנהלת חשבונות</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- CASHFLOW TAB (the full financial tool) -->
+      <div id="ptab-cashflow" class="portal-tab">
+        <div id="fin-tool">
+
+          <!-- Settings modal -->
+          <div class="modal-bg" id="settings-modal" onclick="if(event.target===this)closeSettings()">
+            <div class="modal">
+              <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">
+                <span style="font-weight:800;font-size:14px">⚙️ הגדרות</span>
+                <button class="btn btn-sm" onclick="closeSettings()">✕</button>
+              </div>
+              <div class="form-label" style="margin-bottom:3px">שם לקוח / עסק (לדוחות)</div>
+              <input id="set-client-name" placeholder="שם הלקוח" style="margin-bottom:10px">
+              <button class="btn-solid" onclick="saveSettings()" style="width:100%">שמור</button>
+            </div>
+          </div>
+
+          <!-- fin topbar -->
+          <div id="fin-topbar">
+            <button class="navbtn active" onclick="switchTab('dashboard',this)">📊 סקירה</button>
+            <button class="navbtn" onclick="switchTab('accounts',this)">🏦 חשבונות</button>
+            <button class="navbtn" onclick="switchTab('import',this)">📥 ייבוא</button>
+            <button class="navbtn" onclick="switchTab('reconcile',this)">🔗 התאמה</button>
+            <button class="navbtn" onclick="switchTab('records',this)">📋 רישומים</button>
+            <button class="navbtn" onclick="switchTab('cashflow',this)">💹 תזרים</button>
+            <button class="navbtn no-print" onclick="openSettings()">⚙️</button>
+          </div>
+
+          <!-- ══ DASHBOARD ══ -->
+          <div id="tab-dashboard" class="tab-panel active">
+            <h2>סקירה כללית</h2><p class="subtitle" id="dash-client-lbl">מצב פיננסי עדכני</p>
+            <div class="acct-bar" id="dash-acct-bar"><span style="color:var(--muted);font-size:12px" class="no-print">חשבון:</span><button class="acct-chip all active" onclick="setDashAcct('all',this)">הכל</button></div>
+            <div class="inner-tabs no-print">
+              <button class="itab active" onclick="setDashView('all',this)">הכל</button>
+              <button class="itab biz" onclick="setDashView('biz',this)">🏢 עסקי</button>
+              <button class="itab priv" onclick="setDashView('priv',this)">🏠 פרטי</button>
+            </div>
+            <div class="kpi-grid">
+              <div class="kpi" style="border-top:3px solid var(--accent)"><div class="kpi-lbl">יתרה מוכחת</div><div class="kpi-val" id="kpi-bal" style="color:var(--accent)">₪0</div><div class="kpi-sub" id="kpi-bal-sub"></div></div>
+              <div class="kpi" style="border-top:3px solid var(--blue2)"><div class="kpi-lbl">הכנסות</div><div class="kpi-val" id="kpi-inc" style="color:var(--blue2)">₪0</div></div>
+              <div class="kpi" style="border-top:3px solid var(--red)"><div class="kpi-lbl">הוצאות</div><div class="kpi-val" id="kpi-exp" style="color:var(--red)">₪0</div></div>
+              <div class="kpi" style="border-top:3px solid var(--yellow)"><div class="kpi-lbl">לא מותאם</div><div class="kpi-val" id="kpi-unm" style="color:var(--yellow)">0</div></div>
+            </div>
+            <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
+              <div class="card">
+                <div class="sec-title">עסקי 🏢</div>
+                <div style="display:flex;justify-content:space-between;margin-bottom:5px;font-size:13px"><span style="color:var(--muted)">הכנסות</span><span style="color:var(--blue2);font-weight:700" id="db-inc">₪0</span></div>
+                <div style="display:flex;justify-content:space-between;font-size:13px"><span style="color:var(--muted)">הוצאות</span><span style="color:var(--red);font-weight:700" id="db-exp">₪0</span></div>
+                <div style="height:1px;background:var(--border);margin:7px 0"></div>
+                <div style="display:flex;justify-content:space-between;font-size:13px;font-weight:700"><span>רווח נטו</span><span id="db-net">₪0</span></div>
+              </div>
+              <div class="card">
+                <div class="sec-title">פרטי 🏠</div>
+                <div style="display:flex;justify-content:space-between;margin-bottom:5px;font-size:13px"><span style="color:var(--muted)">הכנסות</span><span style="color:var(--blue2);font-weight:700" id="dp-inc">₪0</span></div>
+                <div style="display:flex;justify-content:space-between;font-size:13px"><span style="color:var(--muted)">הוצאות</span><span style="color:var(--red);font-weight:700" id="dp-exp">₪0</span></div>
+                <div style="height:1px;background:var(--border);margin:7px 0"></div>
+                <div style="display:flex;justify-content:space-between;font-size:13px;font-weight:700"><span>מאזן</span><span id="dp-net">₪0</span></div>
+              </div>
+            </div>
+            <div class="card"><div class="sec-title">הוצאות לפי קטגוריה</div><div id="dash-cats"><div style="color:var(--muted);font-size:12px">אין נתונים</div></div></div>
+            <div class="card">
+              <div class="sec-title">תזרים <span id="dash-period-lbl" style="color:var(--accent);font-size:11px">שבועי</span></div>
+              <div class="period-bar no-print">
+                <button class="period-btn active" onclick="setDashPeriod('week',this)">שבועי</button>
+                <button class="period-btn" onclick="setDashPeriod('month',this)">חודשי</button>
+              </div>
+              <div class="tbl-wrap"><table class="tbl">
+                <thead><tr><th>תקופה</th><th>הכנסות</th><th>הוצאות</th><th>נטו</th></tr></thead>
+                <tbody id="dash-cf-body"><tr><td colspan="4" style="color:var(--muted);text-align:center;padding:12px">אין נתונים</td></tr></tbody>
+              </table></div>
+            </div>
+          </div>
+
+          <!-- ══ ACCOUNTS ══ -->
+          <div id="tab-accounts" class="tab-panel">
+            <h2>ניהול חשבונות</h2><p class="subtitle">חשבונות בנק וכרטיסי אשראי</p>
+            <div class="card no-print">
+              <div class="sec-title">הוסף חשבון</div>
+              <div class="form-grid" style="grid-template-columns:1fr 1fr">
+                <div><div class="form-label">שם</div><input id="acct-name" placeholder="שם החשבון"></div>
+                <div><div class="form-label">סוג</div><select id="acct-type"><option value="bank">🏦 חשבון בנק</option><option value="cc">💳 כרטיס אשראי</option></select></div>
+              </div>
+              <div class="form-grid" style="grid-template-columns:1fr auto;align-items:end">
+                <div><div class="form-label">יתרת פתיחה (₪)</div><input type="number" id="acct-opening" placeholder="0"></div>
+                <button class="btn-solid" onclick="addAccount()" style="height:34px">+ הוסף</button>
+              </div>
+            </div>
+            <div class="card"><div class="sec-title">חשבונות <span id="acct-count" style="color:var(--muted);font-size:11px"></span></div><div id="accts-list"><div style="color:var(--muted);font-size:12px">אין חשבונות</div></div></div>
+          </div>
+
+          <!-- ══ IMPORT ══ -->
+          <div id="tab-import" class="tab-panel">
+            <h2>ייבוא דף בנק</h2><p class="subtitle">ייבא Excel מהבנק ושייך לחשבון</p>
+            <div class="card no-print">
+              <div class="form-grid" style="grid-template-columns:1fr 1fr">
+                <div><div class="form-label">חשבון</div><select id="import-acct-sel"><option value="">-- בחר --</option></select></div>
+                <div><div class="form-label">סיווג</div><select id="import-bp"><option value="biz">🏢 עסקי</option><option value="priv">🏠 פרטי</option></select></div>
+              </div>
+            </div>
+            <div id="dropzone" class="no-print" onclick="document.getElementById('file-input').click()"
+                 ondragover="event.preventDefault();this.classList.add('drag')"
+                 ondragleave="this.classList.remove('drag')"
+                 ondrop="handleDrop(event)">
+              <div style="font-size:26px;margin-bottom:7px">📂</div>
+              <div style="font-weight:700;margin-bottom:4px">לחץ לבחירת קובץ Excel מהבנק</div>
+              <div style="color:var(--muted);font-size:11px">.xlsx / .xls — עמודות: תאריך, תיאור, חיוב, זיכוי</div>
+              <input type="file" id="file-input" accept=".xlsx,.xls" style="display:none" onchange="handleFile(this.files[0])">
+            </div>
+            <div class="card" id="import-result" style="display:none">
+              <div class="sec-title"><span id="import-count">תנועות</span><span id="import-matched" style="color:var(--accent);font-size:11px"></span></div>
+              <div class="tbl-wrap"><table class="tbl">
+                <thead><tr><th>תאריך</th><th>תיאור</th><th>חיוב</th><th>זיכוי</th><th>חשבון</th><th>סטטוס</th></tr></thead>
+                <tbody id="import-tbody"></tbody>
+              </table></div>
+            </div>
+          </div>
+
+          <!-- ══ RECONCILE ══ -->
+          <div id="tab-reconcile" class="tab-panel">
+            <h2>התאמת תנועות</h2>
+            <p class="subtitle">בחר פריט מכל עמודה ולחץ "התאם" — או "הוסף לרישומים" לתנועות חדשות</p>
+            <div id="dup-banner" class="dup-banner" style="display:none"></div>
+            <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:10px;align-items:center" class="no-print">
+              <div class="acct-bar" id="rec-acct-bar" style="margin:0"><span style="color:var(--muted);font-size:11px">חשבון:</span><button class="acct-chip all active" onclick="setRecAcct('all',this)">הכל</button></div>
+              <button class="btn btn-sm no-print" onclick="addAllUnmatched()" style="border-color:var(--yellow);background:#f59e0b15;color:var(--yellow)">⚡ הוסף הכל לרישומים</button>
+            </div>
+            <div id="match-zone" class="rec-match-zone no-print" style="display:none">
+              <div style="font-size:13px;margin-bottom:8px">
+                <span id="mz-left" style="color:var(--blue2);font-weight:700"></span>
+                <span style="color:var(--muted);margin:0 8px">←→</span>
+                <span id="mz-right" style="color:var(--purple);font-weight:700"></span>
+              </div>
+              <div style="display:flex;gap:8px;justify-content:center;flex-wrap:wrap">
+                <button class="btn" onclick="doMatch()" id="btn-do-match">✓ התאם</button>
+                <button class="btn btn-red btn-sm" onclick="clearSelection()">✕ בטל בחירה</button>
+              </div>
+            </div>
+            <div class="rec-split">
+              <div class="rec-col rec-col-right">
+                <div class="rec-col-header"><span>📋 רישומים ידניים</span><span id="rec-col-count" style="color:var(--muted);font-size:11px"></span></div>
+                <div class="rec-col-body" id="rec-col-body"></div>
+                <div class="rec-stats" id="rec-col-stats"></div>
+              </div>
+              <div class="rec-col rec-col-left">
+                <div class="rec-col-header"><span>🏦 תנועות בנק / כרטיס</span><span id="bank-col-count" style="color:var(--muted);font-size:11px"></span></div>
+                <div class="rec-col-body" id="bank-col-body"></div>
+                <div class="rec-stats" id="bank-col-stats"></div>
+              </div>
+            </div>
+            <div class="card">
+              <div class="sec-title">✅ תנועות מותאמות <span id="matched-count" style="color:var(--accent);font-size:11px"></span></div>
+              <div id="matched-list"><div style="color:var(--muted);font-size:12px">אין התאמות עדיין</div></div>
+            </div>
+          </div>
+
+          <!-- ══ RECORDS ══ -->
+          <div id="tab-records" class="tab-panel">
+            <h2>רישומים</h2><p class="subtitle">הוצאות והכנסות — עסקי ופרטי</p>
+            <div class="card no-print">
+              <div class="sec-title">רישום חדש</div>
+              <div style="display:flex;gap:10px;margin-bottom:10px;flex-wrap:wrap;align-items:center">
+                <div class="type-toggle">
+                  <button class="type-btn out active" id="rtype-out" onclick="setRecordType('הוצאה')">הוצאה</button>
+                  <button class="type-btn in" id="rtype-in" onclick="setRecordType('הכנסה')">הכנסה</button>
+                </div>
+                <div class="bp-toggle">
+                  <button class="bp-btn biz active" id="rbp-biz" onclick="setRecordBP('biz')">🏢 עסקי</button>
+                  <button class="bp-btn priv" id="rbp-priv" onclick="setRecordBP('priv')">🏠 פרטי</button>
+                </div>
+              </div>
+              <div class="form-grid" style="grid-template-columns:1fr 1fr">
+                <div><div class="form-label">תאריך</div><input type="date" id="r-date"></div>
+                <div><div class="form-label">חשבון</div><select id="r-acct"><option value="">-- ללא --</option></select></div>
+              </div>
+              <div class="form-grid"><div><div class="form-label">תיאור</div><input type="text" id="r-desc" placeholder="תיאור הפעולה"></div></div>
+              <div class="form-grid" style="grid-template-columns:1fr 1fr">
+                <div><div class="form-label">סכום (₪)</div><input type="number" id="r-amount" placeholder="0.00"></div>
+                <div><div class="form-label">קטגוריה</div><select id="r-cat"></select></div>
+              </div>
+              <button class="btn-solid" onclick="addRecord()" style="width:100%;margin-top:4px">+ הוסף רישום</button>
+            </div>
+            <div class="card no-print" style="padding:10px 14px">
+              <div style="display:flex;gap:7px;flex-wrap:wrap;align-items:center">
+                <select id="flt-type" onchange="renderRecords()" style="width:auto;font-size:12px;padding:4px 7px"><option value="">הכל</option><option value="הוצאה">הוצאות</option><option value="הכנסה">הכנסות</option></select>
+                <select id="flt-bp" onchange="renderRecords()" style="width:auto;font-size:12px;padding:4px 7px"><option value="">עסקי+פרטי</option><option value="biz">עסקי</option><option value="priv">פרטי</option></select>
+                <select id="flt-acct" onchange="renderRecords()" style="width:auto;font-size:12px;padding:4px 7px"><option value="">כל החשבונות</option></select>
+                <select id="flt-cat" onchange="renderRecords()" style="width:auto;font-size:12px;padding:4px 7px"><option value="">כל הקטגוריות</option></select>
+              </div>
+            </div>
+            <div class="print-bar">
+              <button class="btn btn-blue" onclick="exportToExcel()">📊 Excel</button>
+              <button class="btn btn-red" onclick="printSection('records')">🖨️ הדפסה / PDF</button>
+            </div>
+            <div class="card">
+              <div class="sec-title"><span>רישומים</span><span id="rec-count" style="color:var(--muted);font-size:11px"></span></div>
+              <div class="tbl-wrap"><table class="tbl">
+                <thead><tr><th>תאריך</th><th>תיאור</th><th>קטגוריה</th><th>סוג</th><th>עסקי/פרטי</th><th>חשבון</th><th>סכום</th><th>סטטוס</th><th class="no-print"></th></tr></thead>
+                <tbody id="rec-tbody"><tr><td colspan="9" style="color:var(--muted);text-align:center;padding:14px">אין רישומים</td></tr></tbody>
+              </table></div>
+            </div>
+          </div>
+
+          <!-- ══ CASHFLOW ══ -->
+          <div id="tab-cashflow" class="tab-panel">
+            <h2>תזרים מזומנים</h2><p class="subtitle">שבועי וחודשי — עסקי ופרטי</p>
+            <div style="display:flex;gap:7px;flex-wrap:wrap;margin-bottom:10px;align-items:center" class="no-print">
+              <div class="period-bar" style="margin:0">
+                <button class="period-btn active" onclick="setCFPeriod('week',this)">שבועי</button>
+                <button class="period-btn" onclick="setCFPeriod('month',this)">חודשי</button>
+              </div>
+              <select id="cf-acct" onchange="renderCF()" style="width:auto;font-size:12px;padding:4px 7px"><option value="all">כל החשבונות</option></select>
+              <select id="cf-bp" onchange="renderCF()" style="width:auto;font-size:12px;padding:4px 7px"><option value="all">עסקי+פרטי</option><option value="biz">עסקי</option><option value="priv">פרטי</option></select>
+            </div>
+            <div class="print-bar">
+              <button class="btn btn-blue" onclick="exportCFExcel()">📊 Excel</button>
+              <button class="btn btn-red" onclick="printSection('cashflow')">🖨️ הדפסה / PDF</button>
+            </div>
+            <div id="cf-empty" class="card" style="text-align:center;padding:32px;color:var(--muted)">הוסף רישומים לצפייה</div>
+            <div id="cf-content" style="display:none">
+              <div class="card"><div class="sec-title">גרף תזרים</div><div class="bar-chart" id="bar-chart"></div>
+                <div style="display:flex;gap:12px;margin-top:7px"><span style="font-size:11px;color:var(--blue2)">■ הכנסות</span><span style="font-size:11px;color:var(--red)">■ הוצאות</span></div>
+              </div>
+              <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
+                <div class="card"><div class="sec-title" style="color:var(--biz)">עסקי 🏢</div><div id="cf-biz-summary"></div></div>
+                <div class="card"><div class="sec-title" style="color:var(--purple)">פרטי 🏠</div><div id="cf-priv-summary"></div></div>
+              </div>
+              <div class="card"><div class="sec-title">טבלה מפורטת</div>
+                <div class="tbl-wrap"><table class="tbl">
+                  <thead><tr><th>תקופה</th><th>הכ' עסקי</th><th>הו' עסקי</th><th>רווח עסקי</th><th>הכ' פרטי</th><th>הו' פרטי</th><th>מאזן פרטי</th><th>נטו כולל</th><th>יתרה מצטברת</th></tr></thead>
+                  <tbody id="cf-tbody"></tbody>
+                  <tfoot><tr id="cf-tfoot" style="background:var(--surface)"></tr></tfoot>
+                </table></div>
+              </div>
+            </div>
+          </div>
+
+        </div><!-- /fin-tool -->
+      </div><!-- /ptab-cashflow -->
+
+      <!-- PL TAB -->
+      <div id="ptab-pl" class="portal-tab">
+        <div class="coming-soon">
+          <div class="coming-soon-icon">📊</div>
+          <h3>דוח רווח והפסד</h3>
+          <p>מודול זה יאפשר לך לייצר דוח רווח והפסד מפורט<br>בלחיצת כפתור, לפי תקופה שתבחר.</p>
+          <div class="coming-soon-badge">🚀 בקרוב</div>
+        </div>
+      </div>
+
+      <!-- BALANCE TAB -->
+      <div id="ptab-balance" class="portal-tab">
+        <div class="coming-soon">
+          <div class="coming-soon-icon">⚖️</div>
+          <h3>מאזן</h3>
+          <p>סקירת נכסים, התחייבויות והון עצמי של העסק.</p>
+          <div class="coming-soon-badge">🚀 בקרוב</div>
+        </div>
+      </div>
+
+      <!-- VAT TAB -->
+      <div id="ptab-vat" class="portal-tab">
+        <div class="coming-soon">
+          <div class="coming-soon-icon">🧾</div>
+          <h3>ניהול מע"מ</h3>
+          <p>חישוב מע"מ לתשלום / החזר לפי תקופת דיווח.</p>
+          <div class="coming-soon-badge">🚀 בקרוב</div>
+        </div>
+      </div>
+
+      <!-- SALARY TAB -->
+      <div id="ptab-salary" class="portal-tab">
+        <div class="coming-soon">
+          <div class="coming-soon-icon">👷</div>
+          <h3>ניהול שכר</h3>
+          <p>תלושי שכר, דמי ביטוח לאומי ודיווחי מס שכר.</p>
+          <div class="coming-soon-badge">🚀 בקרוב</div>
+        </div>
+      </div>
+
+    </div><!-- /portal-content -->
+  </div><!-- /portal-body -->
+</div><!-- /portal-screen -->
+
+<!-- ═══════════════════════════════════════
+     JAVASCRIPT
+═══════════════════════════════════════ -->
+<script>
+// ══════ AUTH ══════
+const ADMIN_EMAIL = 'admin@primeledger.co.il';
+const ADMIN_PASS  = 'Admin123!';
+
+let currentUser = null;
+
+function getUsers(){
+  try{ return JSON.parse(localStorage.getItem('pl_users')||'{}') }catch(e){return{}}
+}
+function saveUsers(u){ localStorage.setItem('pl_users',JSON.stringify(u)) }
+
+function showAuthTab(tab,btn){
+  document.querySelectorAll('.auth-tab').forEach(b=>b.classList.remove('active'));
+  btn.classList.add('active');
+  document.getElementById('auth-login').style.display = tab==='login'?'block':'none';
+  document.getElementById('auth-register').style.display = tab==='register'?'block':'none';
+}
+
+function doLogin(){
+  const email = document.getElementById('login-email').value.trim().toLowerCase();
+  const pass  = document.getElementById('login-pass').value;
+  const err   = document.getElementById('login-error');
+  err.style.display='none';
+
+  // Admin check
+  if(email===ADMIN_EMAIL && pass===ADMIN_PASS){
+    currentUser = {email, name:'מנהל', biz:'פתרונות פריים לדג\'ר', isAdmin:true};
+    enterPortal();return;
+  }
+
+  const users = getUsers();
+  if(!users[email] || users[email].pass !== pass){
+    err.style.display='block';return;
+  }
+  currentUser = {...users[email], email};
+  enterPortal();
+}
+
+function doRegister(){
+  const name  = document.getElementById('reg-name').value.trim();
+  const biz   = document.getElementById('reg-biz').value.trim();
+  const email = document.getElementById('reg-email').value.trim().toLowerCase();
+  const pass  = document.getElementById('reg-pass').value;
+  const err   = document.getElementById('reg-error');
+  const info  = document.getElementById('reg-info');
+  err.style.display='none'; info.style.display='none';
+
+  if(!name||!email||!pass){ err.textContent='יש למלא את כל השדות'; err.style.display='block'; return; }
+  if(pass.length<6){ err.textContent='הסיסמה חייבת להכיל לפחות 6 תווים'; err.style.display='block'; return; }
+  if(!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)){ err.textContent='כתובת אימייל לא תקינה'; err.style.display='block'; return; }
+
+  const users = getUsers();
+  if(users[email]){ err.textContent='משתמש עם אימייל זה כבר קיים'; err.style.display='block'; return; }
+
+  users[email] = {name, biz, pass};
+  saveUsers(users);
+  info.textContent = '✅ ההרשמה הצליחה! ניתן להתחבר כעת.';
+  info.style.display='block';
+  // clear form
+  ['reg-name','reg-biz','reg-email','reg-pass'].forEach(id=>document.getElementById(id).value='');
+}
+
+function doLogout(){
+  currentUser=null;
+  document.getElementById('auth-screen').style.display='flex';
+  document.getElementById('portal-screen').classList.remove('visible');
+  document.getElementById('login-email').value='';
+  document.getElementById('login-pass').value='';
+}
+
+function enterPortal(){
+  document.getElementById('auth-screen').style.display='none';
+  document.getElementById('portal-screen').classList.add('visible');
+  // Set user info in header
+  const av = document.getElementById('portal-user-avatar');
+  av.textContent = (currentUser.name||'?').charAt(0).toUpperCase();
+  document.getElementById('portal-user-name').textContent = currentUser.name||'';
+  document.getElementById('portal-user-biz').textContent  = currentUser.biz||'';
+  document.getElementById('wc-title').textContent = 'שלום, '+(currentUser.name||'לקוח')+' 👋';
+  document.getElementById('wc-sub').textContent   = currentUser.biz||'ברוך הבא לפורטל הפיננסי שלך';
+  // Load this user's financial data
+  loadUserData();
+  clientName = currentUser.biz||currentUser.name||'';
+  refreshAll();
+}
+
+// ══════ PORTAL TABS ══════
+function switchPortalTab(name, btn){
+  document.querySelectorAll('.portal-tab').forEach(t=>t.classList.remove('active'));
+  document.querySelectorAll('.side-btn').forEach(b=>b.classList.remove('active'));
+  document.getElementById('ptab-'+name).classList.add('active');
+  if(btn) btn.classList.add('active');
+  if(name==='cashflow') refreshAll();
+}
+
+// ══════ PER-USER DATA STORAGE ══════
+function getUserKey(){ return 'fin_'+(currentUser?currentUser.email:'guest') }
+function saveUserData(){ try{localStorage.setItem(getUserKey(),JSON.stringify({accounts,bankRows,records,clientName}))}catch(e){} }
+function loadUserData(){
+  try{
+    const d=JSON.parse(localStorage.getItem(getUserKey())||'null');
+    if(d){accounts=d.accounts||[];bankRows=d.bankRows||[];records=d.records||[];clientName=d.clientName||''}
+    else{accounts=[];bankRows=[];records=[];clientName=''}
+  }catch(e){accounts=[];bankRows=[];records=[];clientName=''}
+}
+
+// ══════ FINANCIAL TOOL STATE ══════
+const BIZ_NAME="פתרונות פריים לדג'ר";
+let clientName="",accounts=[],bankRows=[],records=[];
+let dashAcct="all",dashView="all",dashPeriod="week",recAcct="all",cfPeriod="week";
+let recordType="הוצאה",recordBP="biz";
+let selRec=null, selBank=null;
+
+const MONTHS=["ינ'","פב'","מר'","אפ'","מי'","יו'","יל'","אב'","ספ'","אוק'","נו'","דצ'"];
+const COLORS=["#3b82f6","#8b5cf6","#f59e0b","#10b981","#ef4444","#06b6d4","#f97316","#84cc16"];
+const COUT_BIZ=["שכירות עסקי","שכר עובדים","דלק","חשמל/מים","טלפון/אינטרנט","פרסום/שיווק","ציוד משרדי","הוצאות נסיעה","מסים ואגרות","ביטוח עסקי","ספקים","כיבודים","תחזוקה","הוצאות בנק","אחר עסקי"];
+const COUT_PRI=["שכירות","מזון","סופרמרקט","דלק","חשמל","מים/ארנונה","טלפון","ביטוח","רכב/תחבורה","בריאות","חינוך","פנאי/בידור","בגדים","אחר פרטי"];
+const CIN_BIZ=["הכנסות לקוחות","שכר/משכורת","דמי ניהול","השקעות","מענקים","החזרים","אחר הכנסה עסקי"];
+const CIN_PRI=["משכורת","קצבה","שכ\"ד","ריבית/דיבידנד","מתנות","החזר מס","אחר הכנסה פרטי"];
+
+function save(){ saveUserData(); updateHomeStats(); }
+function load(){ /* handled by loadUserData() */ }
+
+const fmt=n=>new Intl.NumberFormat("he-IL",{style:"currency",currency:"ILS",maximumFractionDigits:0}).format(n||0);
+const fmtD=d=>{if(!d)return"";if(d instanceof Date&&!isNaN(d))return d.toLocaleDateString("he-IL");return String(d).slice(0,10)};
+const el=id=>document.getElementById(id);
+const getA=id=>accounts.find(a=>a.id===id);
+const aC=id=>{const a=getA(id);return a?a.color:"var(--muted)"};
+const aN=id=>{const a=getA(id);return a?a.name:"—"};
+
+// ══════ HOME STATS ══════
+function updateHomeStats(){
+  if(!currentUser) return;
+  const ob=accounts.reduce((s,a)=>s+a.opening,0);
+  const tI=records.filter(r=>r.type==="הכנסה"&&!r.bankRowId).reduce((s,r)=>s+r.amount,0)+bankRows.reduce((s,r)=>s+r.credit,0);
+  const tE=records.filter(r=>r.type==="הוצאה"&&!r.bankRowId).reduce((s,r)=>s+r.amount,0)+bankRows.reduce((s,r)=>s+r.debit,0);
+  const bal=ob+tI-tE;
+  if(el('ws-bal'))el('ws-bal').textContent=fmt(bal);
+  if(el('ws-records'))el('ws-records').textContent=records.length;
+  if(el('ws-unmatched'))el('ws-unmatched').textContent=bankRows.filter(r=>!r.matched).length;
+}
+
+// ══════ DUPLICATE DETECTION ══════
+function findDuplicates(){
+  const dups=[];
+  for(let i=0;i<records.length;i++){
+    for(let j=i+1;j<records.length;j++){
+      const a=records[i],b=records[j];
+      if(Math.abs(a.amount-b.amount)<0.01&&a.description.trim().toLowerCase()===b.description.trim().toLowerCase()&&a.date===b.date&&a.type===b.type)
+        dups.push({type:"records",a:a.id,b:b.id,desc:`רישום כפול: "${a.description}" ${fmt(a.amount)} בתאריך ${a.date}`});
+    }
+  }
+  for(let i=0;i<bankRows.length;i++){
+    for(let j=i+1;j<bankRows.length;j++){
+      const a=bankRows[i],b=bankRows[j];
+      const aAmt=a.debit||a.credit,bAmt=b.debit||b.credit;
+      if(Math.abs(aAmt-bAmt)<0.01&&a.description.trim().toLowerCase()===b.description.trim().toLowerCase()&&String(a.date).slice(0,10)===String(b.date).slice(0,10))
+        dups.push({type:"bank",a:a.id,b:b.id,desc:`תנועת בנק כפולה: "${a.description}" ${fmt(aAmt)}`});
+    }
+  }
+  return dups;
+}
+function showDupBanner(){
+  const dups=findDuplicates();
+  const banner=el("dup-banner");if(!banner)return;
+  if(!dups.length){banner.style.display="none";return}
+  banner.style.display="block";
+  banner.innerHTML=`<strong>⚠️ זוהו ${dups.length} כפילויות:</strong><ul style="margin-top:5px;padding-right:16px">
+    ${dups.map(d=>`<li style="margin-bottom:3px">${d.desc} <button class="btn btn-red btn-sm" onclick="deleteDup('${d.type}','${d.b}')" style="margin-right:6px;font-size:10px">מחק כפיל</button></li>`).join("")}
+  </ul>`;
+}
+function deleteDup(type,id){
+  if(type==="records") records=records.filter(r=>r.id!==id);
+  else bankRows=bankRows.filter(r=>r.id!==id);
+  save();renderReconcile();showDupBanner();
+}
+
+// ══════ RECONCILE ══════
+function setRecAcct(id,btn){recAcct=id;document.querySelectorAll("#rec-acct-bar .acct-chip").forEach(c=>c.classList.remove("active"));btn.classList.add("active");clearSelection();renderReconcile()}
+function clearSelection(){selRec=null;selBank=null;if(el("match-zone"))el("match-zone").style.display="none";renderReconcile()}
+function selectRecItem(id){selRec=(selRec===id)?null:id;updateMatchZone();renderReconcile()}
+function selectBankItem(id){selBank=(selBank===id)?null:id;updateMatchZone();renderReconcile()}
+function updateMatchZone(){
+  const mz=el("match-zone");if(!mz)return;
+  if(!selRec&&!selBank){mz.style.display="none";return}
+  mz.style.display="block";
+  const r=records.find(x=>x.id===selRec);
+  const b=bankRows.find(x=>x.id===selBank);
+  el("mz-right").textContent=r?`${r.description} ${fmt(r.amount)}`:"(לא נבחר)";
+  el("mz-left").textContent=b?`${b.description} ${fmt(b.debit||b.credit)}`:"(לא נבחר)";
+  el("btn-do-match").disabled=!(selRec&&selBank);
+  el("btn-do-match").style.opacity=(selRec&&selBank)?"1":"0.4";
+}
+function doMatch(){
+  if(!selRec||!selBank)return;
+  const row=bankRows.find(r=>r.id===selBank);
+  const entry=records.find(e=>e.id===selRec);
+  if(!row||!entry)return;
+  row.matched=true;row.manualEntryId=selRec;
+  entry.matched=true;entry.bankRowId=selBank;
+  selRec=null;selBank=null;
+  save();renderReconcile();showDupBanner();
+}
+function unmatch(bankId){
+  const row=bankRows.find(r=>r.id===bankId);if(!row)return;
+  if(row.manualEntryId){const e=records.find(e=>e.id===row.manualEntryId);if(e){e.matched=false;e.bankRowId=null}}
+  row.matched=false;row.manualEntryId=null;
+  save();renderReconcile();
+}
+function addBankAsRecord(bankId){
+  const r=bankRows.find(x=>x.id===bankId);if(!r)return;
+  const entry={id:"r-"+Date.now(),date:fmtD(r.date),description:r.description||"פעולה בנקאית",
+    amount:r.debit||r.credit,type:r.debit>0?"הוצאה":"הכנסה",
+    category:r.debit>0?"אחר עסקי":"אחר הכנסה עסקי",bp:r.bp||"biz",
+    acctId:r.acctId,matched:true,bankRowId:r.id};
+  r.matched=true;r.manualEntryId=entry.id;
+  records.push(entry);save();renderReconcile();showDupBanner();
+}
+function addAllUnmatched(){
+  const af=recAcct==="all"?null:recAcct;
+  bankRows.filter(r=>!r.matched&&(!af||r.acctId===af)).forEach(r=>{
+    const e={id:"r-"+r.id+Date.now(),date:fmtD(r.date),description:r.description||"פעולה בנקאית",
+      amount:r.debit||r.credit,type:r.debit>0?"הוצאה":"הכנסה",
+      category:r.debit>0?"אחר עסקי":"אחר הכנסה עסקי",bp:r.bp||"biz",
+      acctId:r.acctId,matched:true,bankRowId:r.id};
+    r.matched=true;r.manualEntryId=e.id;records.push(e);
+  });
+  save();renderReconcile();showDupBanner();
+}
+function renderReconcile(){
+  const af=recAcct==="all"?null:recAcct;
+  const dups=findDuplicates();
+  const dupRecIds=new Set(dups.filter(d=>d.type==="records").flatMap(d=>[d.a,d.b]));
+  const dupBankIds=new Set(dups.filter(d=>d.type==="bank").flatMap(d=>[d.a,d.b]));
+  const unmRecs=records.filter(r=>!r.matched&&(!af||r.acctId===af));
+  if(el("rec-col-count"))el("rec-col-count").textContent=unmRecs.length+" ממתינים";
+  const recTotalExp=unmRecs.filter(r=>r.type==="הוצאה").reduce((s,r)=>s+r.amount,0);
+  const recTotalInc=unmRecs.filter(r=>r.type==="הכנסה").reduce((s,r)=>s+r.amount,0);
+  if(el("rec-col-stats"))el("rec-col-stats").innerHTML=`<span style="color:var(--blue2)">הכנסות: ${fmt(recTotalInc)}</span><span style="color:var(--red)">הוצאות: ${fmt(recTotalExp)}</span>`;
+  if(el("rec-col-body")){
+    if(!unmRecs.length) el("rec-col-body").innerHTML=`<div style="color:var(--muted);font-size:12px;text-align:center;padding:20px">✓ כל הרישומים מותאמים</div>`;
+    else el("rec-col-body").innerHTML=unmRecs.sort((a,b)=>b.date.localeCompare(a.date)).map(r=>{
+      const isSel=selRec===r.id,isDup=dupRecIds.has(r.id);
+      return `<div class="rec-item rec-item-rec${isSel?" selected":""}${isDup?" dup-flag":""}" onclick="selectRecItem('${r.id}')">
+        ${isDup?`<span class="badge b-dup" style="position:absolute;top:6px;left:6px">כפיל!</span>`:""}
+        <div class="rec-item-desc">${r.description}</div>
+        <div class="rec-item-amount" style="color:${r.type==="הוצאה"?"var(--red)":"var(--accent)"}">${r.type==="הוצאה"?"-":"+"}${fmt(r.amount)}</div>
+        <div class="rec-item-date">${r.date} · <span class="badge ${r.bp==="biz"?"bb":"bp"}">${r.bp==="biz"?"🏢":"🏠"}</span> · ${r.category}</div>
+        ${r.acctId?`<div class="rec-item-acct"><span style="color:${aC(r.acctId)}">●</span> ${aN(r.acctId)}</div>`:""}
+        <div style="font-size:10px;color:var(--muted);margin-top:4px">${isSel?"✓ נבחר":"לחץ לבחירה"}</div>
+      </div>`;
+    }).join("");
+  }
+  const unmBank=bankRows.filter(r=>!r.matched&&(!af||r.acctId===af));
+  if(el("bank-col-count"))el("bank-col-count").textContent=unmBank.length+" תנועות";
+  const bankTotalDeb=unmBank.reduce((s,r)=>s+r.debit,0);
+  const bankTotalCre=unmBank.reduce((s,r)=>s+r.credit,0);
+  if(el("bank-col-stats"))el("bank-col-stats").innerHTML=`<span style="color:var(--blue2)">זיכויים: ${fmt(bankTotalCre)}</span><span style="color:var(--red)">חיובים: ${fmt(bankTotalDeb)}</span>`;
+  if(el("bank-col-body")){
+    if(!unmBank.length) el("bank-col-body").innerHTML=`<div style="color:var(--muted);font-size:12px;text-align:center;padding:20px">✓ כל תנועות הבנק מותאמות</div>`;
+    else el("bank-col-body").innerHTML=unmBank.sort((a,b)=>String(b.date).localeCompare(String(a.date))).map(r=>{
+      const isSel=selBank===r.id,isDup=dupBankIds.has(r.id);
+      const amt=r.debit||r.credit,isDebit=r.debit>0;
+      const suggest=records.find(m=>!m.matched&&Math.abs(m.amount-amt)<1);
+      return `<div class="rec-item rec-item-bank${isSel?" selected":""}${isDup?" dup-flag":""}" onclick="selectBankItem('${r.id}')">
+        ${isDup?`<span class="badge b-dup" style="position:absolute;top:6px;left:6px">כפיל!</span>`:""}
+        <div class="rec-item-desc">${r.description||"פעולה בנקאית"}</div>
+        <div class="rec-item-amount" style="color:${isDebit?"var(--red)":"var(--accent)"}">${isDebit?"-":"+"}${fmt(amt)}</div>
+        <div class="rec-item-date">${fmtD(r.date)}${r.acctId?` · <span style="color:${aC(r.acctId)}">●</span> ${aN(r.acctId)}`:""}</div>
+        ${suggest?`<div style="font-size:10px;color:var(--yellow);margin-top:3px">💡 רישום דומה: "${suggest.description}"</div>`:""}
+        <div class="rec-item-actions no-print">
+          <button class="btn-add-rec" onclick="event.stopPropagation();addBankAsRecord('${r.id}')">+ הוסף לרישומים</button>
+          <div style="font-size:10px;color:var(--muted);text-align:center;margin-top:2px">${isSel?"✓ נבחר":"לחץ לבחירה"}</div>
+        </div>
+      </div>`;
+    }).join("");
+  }
+  const mat=bankRows.filter(r=>r.matched&&(!af||r.acctId===af));
+  if(el("matched-count"))el("matched-count").textContent=mat.length+" זוגות";
+  if(el("matched-list")){
+    if(!mat.length) el("matched-list").innerHTML=`<div style="color:var(--muted);font-size:12px">אין התאמות</div>`;
+    else el("matched-list").innerHTML=`<div class="tbl-wrap"><table class="tbl">
+      <thead><tr><th>תאריך בנק</th><th>תיאור בנק</th><th>סכום</th><th>רישום מותאם</th><th>קטגוריה</th><th class="no-print"></th></tr></thead>
+      <tbody>${mat.map(r=>{
+        const e=records.find(x=>x.id===r.manualEntryId);
+        return `<tr><td>${fmtD(r.date)}</td><td>${r.description}</td>
+          <td style="color:${r.debit>0?"var(--red)":"var(--accent)"};font-weight:700">${r.debit>0?"-":"+"}${fmt(r.debit||r.credit)}</td>
+          <td>${e?e.description:"(אוטומטי)"}</td>
+          <td>${e?`<span class="badge bb">${e.category}</span>`:""}</td>
+          <td class="no-print"><button class="btn btn-red btn-sm" onclick="unmatch('${r.id}')">בטל</button></td>
+        </tr>`;
+      }).join("")}</tbody></table></div>`;
+  }
+}
+
+// ══════ SETTINGS ══════
+function openSettings(){if(el("set-client-name"))el("set-client-name").value=clientName;if(el("settings-modal"))el("settings-modal").classList.add("open")}
+function closeSettings(){if(el("settings-modal"))el("settings-modal").classList.remove("open")}
+function saveSettings(){clientName=el("set-client-name").value.trim();save();closeSettings();refreshAll()}
+function updateLabels(){
+  if(el("dash-client-lbl"))el("dash-client-lbl").textContent="מצב פיננסי עדכני"+(clientName?" | "+clientName:"");
+  if(el("ph-client"))el("ph-client").textContent=clientName?"לקוח: "+clientName:"";
+  if(el("ph-date"))el("ph-date").textContent="תאריך הפקה: "+new Date().toLocaleDateString("he-IL");
+}
+function printSection(s){
+  document.querySelectorAll(".tab-panel").forEach(p=>p.classList.remove("print-active"));
+  if(el("tab-"+s))el("tab-"+s).classList.add("print-active");window.print();
+  document.querySelectorAll(".tab-panel").forEach(p=>p.classList.remove("print-active"));
+}
+function switchTab(n,btn){
+  document.querySelectorAll("#fin-topbar .navbtn").forEach(b=>b.classList.remove("active"));
+  document.querySelectorAll("#fin-tool .tab-panel").forEach(p=>p.classList.remove("active"));
+  if(btn)btn.classList.add("active");
+  if(el("tab-"+n))el("tab-"+n).classList.add("active");
+  refreshAll();
+}
+
+// ══════ ACCOUNTS ══════
+function addAccount(){
+  const name=el("acct-name").value.trim();if(!name){alert("נא להזין שם");return}
+  accounts.push({id:"acct-"+Date.now(),name,type:el("acct-type").value,opening:parseFloat(el("acct-opening").value)||0,color:COLORS[accounts.length%COLORS.length]});
+  el("acct-name").value="";el("acct-opening").value="";save();refreshAll();
+}
+function deleteAccount(id){
+  if(!confirm("למחוק?"))return;
+  accounts=accounts.filter(a=>a.id!==id);bankRows=bankRows.filter(r=>r.acctId!==id);save();refreshAll();
+}
+function renderAccounts(){
+  if(!el("acct-count"))return;
+  el("acct-count").textContent=accounts.length+" חשבונות";
+  if(!accounts.length){el("accts-list").innerHTML=`<div style="color:var(--muted);font-size:12px">אין חשבונות</div>`;return}
+  el("accts-list").innerHTML=accounts.map(a=>{
+    const aR=records.filter(r=>r.acctId===a.id&&!r.bankRowId);
+    const aB=bankRows.filter(r=>r.acctId===a.id);
+    const inc=aR.filter(r=>r.type==="הכנסה").reduce((s,r)=>s+r.amount,0)+aB.reduce((s,r)=>s+r.credit,0);
+    const exp=aR.filter(r=>r.type==="הוצאה").reduce((s,r)=>s+r.amount,0)+aB.reduce((s,r)=>s+r.debit,0);
+    const bal=a.opening+inc-exp;
+    return `<div class="card2" style="border-right:3px solid ${a.color}">
+      <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:5px">
+        <div><span style="font-weight:700">${a.name}</span> <span class="badge ${a.type==="bank"?"bb":"bp"}">${a.type==="bank"?"🏦":"💳"}</span></div>
+        <div style="display:flex;gap:7px;align-items:center">
+          <span style="color:${bal>=0?"var(--accent)":"var(--red)"};font-weight:800;font-size:14px">${fmt(bal)}</span>
+          <button class="btn btn-red btn-sm no-print" onclick="deleteAccount('${a.id}')">מחק</button>
+        </div>
+      </div>
+      <div style="display:flex;gap:12px;margin-top:5px;font-size:11px;flex-wrap:wrap;color:var(--muted)">
+        <span>פתיחה: <b style="color:var(--text)">${fmt(a.opening)}</b></span>
+        <span>הכנסות: <b style="color:var(--blue2)">${fmt(inc)}</b></span>
+        <span>הוצאות: <b style="color:var(--red)">${fmt(exp)}</b></span>
+      </div></div>`;
+  }).join("");
+}
+
+// ══════ CHIPS ══════
+function buildChips(cid,cur,fn){
+  const bar=el(cid);if(!bar)return;
+  bar.querySelectorAll(".acct-chip:not(.all)").forEach(c=>c.remove());
+  accounts.forEach(a=>{
+    const btn=document.createElement("button");
+    btn.className="acct-chip "+(a.type==="bank"?"bank":"cc")+(cur===a.id?" active":"");
+    btn.innerHTML=`<span class="acct-dot" style="background:${a.color}"></span>${a.name}`;
+    btn.onclick=()=>fn(a.id,btn);bar.appendChild(btn);
+  });
+}
+function setDashAcct(id,btn){dashAcct=id;document.querySelectorAll("#dash-acct-bar .acct-chip").forEach(c=>c.classList.remove("active"));btn.classList.add("active");refreshDashboard()}
+function setDashView(v,btn){dashView=v;document.querySelectorAll("#tab-dashboard .itab").forEach(b=>b.classList.remove("active"));btn.classList.add("active");refreshDashboard()}
+function setDashPeriod(v,btn){dashPeriod=v;document.querySelectorAll("#tab-dashboard .period-btn").forEach(b=>b.classList.remove("active"));btn.classList.add("active");if(el("dash-period-lbl"))el("dash-period-lbl").textContent=v==="week"?"שבועי":"חודשי";refreshDashboard()}
+
+// ══════ CATEGORIES ══════
+function getCats(){if(recordType==="הוצאה")return recordBP==="biz"?COUT_BIZ:COUT_PRI;return recordBP==="biz"?CIN_BIZ:CIN_PRI}
+function refreshCatSelect(){const s=el("r-cat");if(!s)return;s.innerHTML=getCats().map(c=>`<option>${c}</option>`).join("")}
+function setRecordType(t){recordType=t;if(el("rtype-out"))el("rtype-out").classList.toggle("active",t==="הוצאה");if(el("rtype-in"))el("rtype-in").classList.toggle("active",t==="הכנסה");refreshCatSelect()}
+function setRecordBP(bp){recordBP=bp;if(el("rbp-biz"))el("rbp-biz").classList.toggle("active",bp==="biz");if(el("rbp-priv"))el("rbp-priv").classList.toggle("active",bp==="priv");refreshCatSelect()}
+
+// ══════ RECORDS ══════
+function addRecord(){
+  const desc=el("r-desc").value.trim(),amount=parseFloat(el("r-amount").value);
+  if(!desc||isNaN(amount)||amount<=0){alert("נא למלא תיאור וסכום");return}
+  const near=records.find(r=>r.description.trim().toLowerCase()===desc.toLowerCase()&&Math.abs(r.amount-amount)<0.01&&r.date===el("r-date").value&&r.type===recordType);
+  if(near&&!confirm(`קיים רישום דומה:\n"${near.description}" ${fmt(near.amount)}\nהאם להוסיף בכל זאת?`))return;
+  records.push({id:"r-"+Date.now(),date:el("r-date").value||new Date().toISOString().slice(0,10),
+    description:desc,amount,type:recordType,bp:recordBP,category:el("r-cat").value,
+    acctId:el("r-acct").value||null,matched:false});
+  el("r-desc").value="";el("r-amount").value="";save();refreshAll();
+}
+function deleteRecord(id){
+  const r=records.find(x=>x.id===id);
+  if(r&&r.bankRowId){const br=bankRows.find(b=>b.id===r.bankRowId);if(br){br.matched=false;br.manualEntryId=null}}
+  records=records.filter(x=>x.id!==id);save();refreshAll();
+}
+function renderRecords(){
+  const ft=el("flt-type")?el("flt-type").value:"",fb=el("flt-bp")?el("flt-bp").value:"",fa=el("flt-acct")?el("flt-acct").value:"",fc=el("flt-cat")?el("flt-cat").value:"";
+  let f=records.filter(r=>(!ft||r.type===ft)&&(!fb||r.bp===fb)&&(!fa||r.acctId===fa)&&(!fc||r.category===fc));
+  if(el("rec-count"))el("rec-count").textContent=f.length+" רישומים | "+fmt(f.reduce((s,r)=>s+(r.type==="הוצאה"?-r.amount:r.amount),0));
+  const tb=el("rec-tbody");if(!tb)return;
+  if(!f.length){tb.innerHTML=`<tr><td colspan="9" style="color:var(--muted);text-align:center;padding:14px">אין רישומים</td></tr>`;return}
+  const dups=findDuplicates();const dupIds=new Set(dups.filter(d=>d.type==="records").flatMap(d=>[d.a,d.b]));
+  tb.innerHTML=f.sort((a,b)=>b.date.localeCompare(a.date)).map(r=>`<tr style="${dupIds.has(r.id)?"background:#ef444410":""}">
+    <td>${r.date}</td><td>${r.description}${dupIds.has(r.id)?` <span class="badge b-dup">כפיל</span>`:""}</td>
+    <td><span class="badge bb">${r.category}</span></td>
+    <td><span class="badge ${r.type==="הוצאה"?"br":"bg"}">${r.type}</span></td>
+    <td><span class="badge ${r.bp==="biz"?"bb":"bp"}">${r.bp==="biz"?"🏢":"🏠"}</span></td>
+    <td>${r.acctId?`<span style="color:${aC(r.acctId)};font-size:11px">●</span> ${aN(r.acctId)}`:"—"}</td>
+    <td style="color:${r.type==="הוצאה"?"var(--red)":"var(--accent)"};font-weight:700">${r.type==="הוצאה"?"-":"+"}${fmt(r.amount)}</td>
+    <td>${r.matched?`<span class="badge bg">✓ מותאם</span>`:`<span class="badge by">ממתין</span>`}</td>
+    <td class="no-print"><button class="btn btn-red btn-sm" onclick="deleteRecord('${r.id}')">מחק</button></td>
+  </tr>`).join("");
+  const uC=[...new Set(records.map(r=>r.category))];
+  if(el("flt-cat"))el("flt-cat").innerHTML=`<option value="">כל הקטגוריות</option>`+uC.map(c=>`<option value="${c}"${fc===c?" selected":""}>${c}</option>`).join("");
+}
+
+// ══════ FILE IMPORT ══════
+function handleDrop(e){e.preventDefault();if(el("dropzone"))el("dropzone").classList.remove("drag");handleFile(e.dataTransfer.files[0])}
+function handleFile(file){
+  if(!file)return;
+  const acctId=el("import-acct-sel").value,bp=el("import-bp").value;
+  const reader=new FileReader();
+  reader.onload=e=>{
+    const wb=XLSX.read(e.target.result,{type:"binary",cellDates:true});
+    const ws=wb.Sheets[wb.SheetNames[0]];
+    parseBankData(XLSX.utils.sheet_to_json(ws,{header:1,raw:false,dateNF:"yyyy-mm-dd"}),acctId,bp);
+  };
+  reader.readAsBinaryString(file);
+}
+function parseBankData(data,acctId,bp){
+  let added=0,dupes=0;
+  for(let i=1;i<data.length;i++){
+    const r=data[i];if(!r||r.every(c=>!c))continue;
+    let date=r[0],desc=r[1],debit=0,credit=0;
+    for(let j=2;j<Math.min(r.length,6);j++){
+      const v=parseFloat(String(r[j]).replace(/,/g,""));
+      if(!isNaN(v)&&v>0){if(j===2)debit=v;else if(j===3)credit=v}
+    }
+    if(!desc&&!debit&&!credit)continue;
+    const existingBank=bankRows.find(b=>b.description.trim()===String(desc||"").trim()&&Math.abs((b.debit||b.credit)-(debit||credit))<0.01&&String(b.date).slice(0,10)===String(date).slice(0,10));
+    if(existingBank){dupes++;continue}
+    const mI=records.findIndex(m=>!m.matched&&Math.abs(m.amount-(debit||credit))<0.5&&m.description.trim()===String(desc||"").trim());
+    const row={id:"bank-"+Date.now()+"-"+i,acctId:acctId||null,date,description:String(desc||""),debit,credit,matched:mI>=0,manualEntryId:mI>=0?records[mI].id:null,bp:bp||"biz"};
+    if(mI>=0){records[mI].matched=true;records[mI].bankRowId=row.id}
+    bankRows.push(row);added++;
+  }
+  if(el("import-result"))el("import-result").style.display="block";
+  if(el("import-count"))el("import-count").textContent=`יובאו ${added} תנועות${dupes?` (${dupes} כפילויות דולגו)`:""}`;
+  if(el("import-matched"))el("import-matched").textContent=bankRows.filter(r=>r.matched).length+" מותאמות";
+  if(el("import-tbody"))el("import-tbody").innerHTML=bankRows.slice(-60).map(r=>`<tr style="background:${r.matched?"#10b98111":"transparent"}">
+    <td>${fmtD(r.date)}</td><td>${r.description}</td>
+    <td style="color:var(--red)">${r.debit>0?fmt(r.debit):""}</td>
+    <td style="color:var(--blue2)">${r.credit>0?fmt(r.credit):""}</td>
+    <td>${r.acctId?`<span style="color:${aC(r.acctId)}">●</span> ${aN(r.acctId)}`:"—"}</td>
+    <td>${r.matched?`<span class="badge bg">✓</span>`:`<span class="badge by">ממתין</span>`}</td>
+  </tr>`).join("");
+  save();refreshAll();showDupBanner();
+}
+
+// ══════ CASHFLOW ══════
+function setCFPeriod(p,btn){cfPeriod=p;document.querySelectorAll("#tab-cashflow .period-btn").forEach(b=>b.classList.remove("active"));btn.classList.add("active");renderCF()}
+function getPK(d,p){
+  const dt=new Date(d);if(isNaN(dt))return null;
+  if(p==="month")return`${dt.getFullYear()}-${String(dt.getMonth()+1).padStart(2,"0")}`;
+  const j=new Date(dt.getFullYear(),0,1);const w=Math.ceil(((dt-j)/86400000+j.getDay()+1)/7);
+  return`${dt.getFullYear()}-W${String(w).padStart(2,"0")}`;
+}
+function getPL(k,p){
+  if(p==="month"){const[y,m]=k.split("-");return`${MONTHS[parseInt(m)-1]} ${y}`}
+  const[y,w]=k.split("-W");return`שב' ${w}/${y}`;
+}
+function buildCFMap(af,bf,p){
+  const map={};
+  const add=(d,deb,cre,bp,ai)=>{
+    if(af&&af!=="all"&&ai!==af)return;
+    if(bf&&bf!=="all"&&bp!==bf)return;
+    const k=getPK(d instanceof Date?d.toISOString():d,p);if(!k)return;
+    if(!map[k])map[k]={k,label:getPL(k,p),bizInc:0,bizExp:0,privInc:0,privExp:0};
+    const m=map[k],b=bp==="biz";
+    if(b){m.bizInc+=cre||0;m.bizExp+=deb||0}else{m.privInc+=cre||0;m.privExp+=deb||0}
+  };
+  bankRows.forEach(r=>add(r.date,r.debit,r.credit,r.bp||"biz",r.acctId));
+  records.filter(r=>!r.bankRowId).forEach(r=>add(r.date,r.type==="הוצאה"?r.amount:0,r.type==="הכנסה"?r.amount:0,r.bp,r.acctId));
+  return Object.values(map).sort((a,b)=>a.k.localeCompare(b.k));
+}
+function renderCF(){
+  const af=el("cf-acct")?el("cf-acct").value:"all";
+  const bf=el("cf-bp")?el("cf-bp").value:"all";
+  const cf=buildCFMap(af,bf,cfPeriod);
+  if(!cf.length){if(el("cf-empty"))el("cf-empty").style.display="block";if(el("cf-content"))el("cf-content").style.display="none";return}
+  if(el("cf-empty"))el("cf-empty").style.display="none";if(el("cf-content"))el("cf-content").style.display="block";
+  const maxV=Math.max(...cf.map(r=>Math.max(r.bizInc+r.privInc,r.bizExp+r.privExp)),1);
+  if(el("bar-chart"))el("bar-chart").innerHTML=cf.map(row=>{
+    const inc=row.bizInc+row.privInc,exp=row.bizExp+row.privExp,net=inc-exp;
+    return`<div class="bar-col"><div class="bar-bars">
+      <div class="bar" style="background:var(--blue2);height:${Math.max(2,(inc/maxV)*90)}px"></div>
+      <div class="bar" style="background:var(--red);height:${Math.max(2,(exp/maxV)*90)}px"></div>
+    </div><div class="bar-lbl">${row.label}</div>
+    <div class="bar-net" style="color:${net>=0?"var(--accent)":"var(--red)"}">${net>=0?"+":""}${Math.round(net/1000)}K</div></div>`;
+  }).join("");
+  const tBI=cf.reduce((s,r)=>s+r.bizInc,0),tBE=cf.reduce((s,r)=>s+r.bizExp,0);
+  const tPI=cf.reduce((s,r)=>s+r.privInc,0),tPE=cf.reduce((s,r)=>s+r.privExp,0);
+  const sH=(val,col)=>`<div style="display:flex;justify-content:space-between;margin-bottom:5px;font-size:12px"><span style="color:var(--muted)">${col==="var(--blue2)"?"הכנסות":"הוצאות"}</span><span style="color:${col};font-weight:700">${fmt(val)}</span></div>`;
+  if(el("cf-biz-summary"))el("cf-biz-summary").innerHTML=sH(tBI,"var(--blue2)")+sH(tBE,"var(--red)")+`<div style="height:1px;background:var(--border);margin:6px 0"></div><div style="display:flex;justify-content:space-between;font-size:13px;font-weight:700"><span>רווח נטו</span><span style="color:${tBI-tBE>=0?"var(--accent)":"var(--red)"}">${fmt(tBI-tBE)}</span></div>`;
+  if(el("cf-priv-summary"))el("cf-priv-summary").innerHTML=sH(tPI,"var(--blue2)")+sH(tPE,"var(--red)")+`<div style="height:1px;background:var(--border);margin:6px 0"></div><div style="display:flex;justify-content:space-between;font-size:13px;font-weight:700"><span>מאזן</span><span style="color:${tPI-tPE>=0?"var(--accent)":"var(--red)"}">${fmt(tPI-tPE)}</span></div>`;
+  const ob=accounts.reduce((s,a)=>s+a.opening,0);let cum=ob;
+  if(el("cf-tbody"))el("cf-tbody").innerHTML=cf.map(row=>{
+    const inc=row.bizInc+row.privInc,exp=row.bizExp+row.privExp,net=inc-exp;cum+=net;
+    const bN=row.bizInc-row.bizExp,pN=row.privInc-row.privExp;
+    return`<tr><td style="font-weight:600;white-space:nowrap">${row.label}</td>
+      <td style="color:var(--blue2)">${fmt(row.bizInc)}</td><td style="color:var(--red)">${fmt(row.bizExp)}</td>
+      <td style="color:${bN>=0?"var(--accent)":"var(--red)"};font-weight:700">${bN>=0?"+":""}${fmt(bN)}</td>
+      <td style="color:var(--blue2)">${fmt(row.privInc)}</td><td style="color:var(--red)">${fmt(row.privExp)}</td>
+      <td style="color:${pN>=0?"var(--accent)":"var(--red)"};font-weight:700">${pN>=0?"+":""}${fmt(pN)}</td>
+      <td style="color:${net>=0?"var(--accent)":"var(--red)"};font-weight:800">${net>=0?"+":""}${fmt(net)}</td>
+      <td style="color:${cum>=0?"var(--accent)":"var(--red)"};font-weight:800">${fmt(cum)}</td></tr>`;
+  }).join("");
+  const tI=tBI+tPI,tE=tBE+tPE;
+  if(el("cf-tfoot"))el("cf-tfoot").innerHTML=`<td style="padding:6px 8px;font-weight:800">סה"כ</td>
+    <td style="padding:6px 8px;color:var(--blue2);font-weight:800">${fmt(tBI)}</td><td style="padding:6px 8px;color:var(--red);font-weight:800">${fmt(tBE)}</td>
+    <td style="padding:6px 8px;font-weight:800;color:var(--accent)">${fmt(tBI-tBE)}</td>
+    <td style="padding:6px 8px;color:var(--blue2);font-weight:800">${fmt(tPI)}</td><td style="padding:6px 8px;color:var(--red);font-weight:800">${fmt(tPE)}</td>
+    <td style="padding:6px 8px;font-weight:800;color:var(--accent)">${fmt(tPI-tPE)}</td>
+    <td style="padding:6px 8px;font-weight:800;color:var(--accent)">${fmt(tI-tE)}</td>
+    <td style="padding:6px 8px;font-weight:800;color:var(--accent)">${fmt(cum)}</td>`;
+}
+
+// ══════ DASHBOARD ══════
+function refreshDashboard(){
+  buildChips("dash-acct-bar",dashAcct,(id,btn)=>setDashAcct(id,btn));
+  const af=dashAcct==="all"?null:dashAcct;
+  const fR=records.filter(r=>(!af||r.acctId===af)&&(dashView==="all"||r.bp===dashView)&&!r.bankRowId);
+  const fB=bankRows.filter(r=>(!af||r.acctId===af));
+  const tI=fR.filter(r=>r.type==="הכנסה").reduce((s,r)=>s+r.amount,0)+fB.reduce((s,r)=>s+r.credit,0);
+  const tE=fR.filter(r=>r.type==="הוצאה").reduce((s,r)=>s+r.amount,0)+fB.reduce((s,r)=>s+r.debit,0);
+  const ob=af?((getA(af)||{}).opening||0):accounts.reduce((s,a)=>s+a.opening,0);
+  const bal=ob+tI-tE;
+  if(el("kpi-bal")){el("kpi-bal").textContent=fmt(bal);el("kpi-bal").style.color=bal>=0?"var(--accent)":"var(--red)";}
+  if(el("kpi-bal-sub"))el("kpi-bal-sub").textContent="פתיחה: "+fmt(ob);
+  if(el("kpi-inc"))el("kpi-inc").textContent=fmt(tI);
+  if(el("kpi-exp"))el("kpi-exp").textContent=fmt(tE);
+  if(el("kpi-unm"))el("kpi-unm").textContent=bankRows.filter(r=>!r.matched).length+" תנועות";
+  const bB=bankRows.filter(r=>r.bp==="biz"&&(!af||r.acctId===af));
+  const pB=bankRows.filter(r=>r.bp==="priv"&&(!af||r.acctId===af));
+  const bR=records.filter(r=>r.bp==="biz"&&(!af||r.acctId===af)&&!r.bankRowId);
+  const pR=records.filter(r=>r.bp==="priv"&&(!af||r.acctId===af)&&!r.bankRowId);
+  const bI=bR.filter(r=>r.type==="הכנסה").reduce((s,r)=>s+r.amount,0)+bB.reduce((s,r)=>s+r.credit,0);
+  const bE=bR.filter(r=>r.type==="הוצאה").reduce((s,r)=>s+r.amount,0)+bB.reduce((s,r)=>s+r.debit,0);
+  const pI=pR.filter(r=>r.type==="הכנסה").reduce((s,r)=>s+r.amount,0)+pB.reduce((s,r)=>s+r.credit,0);
+  const pE=pR.filter(r=>r.type==="הוצאה").reduce((s,r)=>s+r.amount,0)+pB.reduce((s,r)=>s+r.debit,0);
+  if(el("db-inc"))el("db-inc").textContent=fmt(bI);if(el("db-exp"))el("db-exp").textContent=fmt(bE);
+  const bN=bI-bE;if(el("db-net")){el("db-net").textContent=fmt(bN);el("db-net").style.color=bN>=0?"var(--accent)":"var(--red)";}
+  if(el("dp-inc"))el("dp-inc").textContent=fmt(pI);if(el("dp-exp"))el("dp-exp").textContent=fmt(pE);
+  const pN=pI-pE;if(el("dp-net")){el("dp-net").textContent=fmt(pN);el("dp-net").style.color=pN>=0?"var(--accent)":"var(--red)";}
+  const catMap={};
+  fR.filter(r=>r.type==="הוצאה").forEach(r=>{catMap[r.category]=(catMap[r.category]||0)+r.amount});
+  fB.filter(r=>r.debit>0&&!r.manualEntryId).forEach(r=>{catMap["אחר"]=(catMap["אחר"]||0)+r.debit});
+  const cats=Object.entries(catMap).sort(([,a],[,b])=>b-a).slice(0,8);
+  if(el("dash-cats"))el("dash-cats").innerHTML=cats.length?cats.map(([cat,val])=>{
+    const pct=Math.min(100,(val/(tE||1))*100);
+    return`<div class="cat-row"><div class="cat-header"><span>${cat}</span><span style="color:var(--red)">${fmt(val)}</span></div>
+      <div class="cat-bg"><div class="cat-fill" style="width:${pct}%;background:var(--red)"></div></div></div>`;
+  }).join(""):"<div style='color:var(--muted);font-size:12px'>אין נתונים</div>";
+  const cf=buildCFMap(af,"all",dashPeriod);
+  if(el("dash-cf-body"))el("dash-cf-body").innerHTML=cf.length?cf.slice(-8).map(row=>{
+    const inc=row.bizInc+row.privInc,exp=row.bizExp+row.privExp,net=inc-exp;
+    return`<tr><td>${row.label}</td><td style="color:var(--blue2)">${fmt(inc)}</td><td style="color:var(--red)">${fmt(exp)}</td>
+      <td style="color:${net>=0?"var(--accent)":"var(--red)"};font-weight:700">${net>=0?"+":""}${fmt(net)}</td></tr>`;
+  }).join(""):"<tr><td colspan='4' style='color:var(--muted);text-align:center;padding:12px'>אין נתונים</td></tr>";
+}
+
+// ══════ EXPORT ══════
+function getHdr(){const r=[["פתרונות פריים לדג'ר | הנהלת חשבונות"]];if(clientName)r.push(["לקוח: "+clientName]);r.push(["תאריך: "+new Date().toLocaleDateString("he-IL")],[]);return r}
+function exportToExcel(){
+  const wb=XLSX.utils.book_new();
+  const d=[...getHdr(),["תאריך","תיאור","קטגוריה","סוג","עסקי/פרטי","חשבון","סכום","סטטוס"],
+    ...records.map(r=>[r.date,r.description,r.category,r.type,r.bp==="biz"?"עסקי":"פרטי",aN(r.acctId),r.type==="הוצאה"?-r.amount:r.amount,r.matched?"מותאם":"ממתין"])];
+  XLSX.utils.book_append_sheet(wb,XLSX.utils.aoa_to_sheet(d),"רישומים");
+  const ob=accounts.reduce((s,a)=>s+a.opening,0);let cum=ob;
+  const cd=[...getHdr(),["תקופה","הכנסות עסקי","הוצאות עסקי","רווח עסקי","הכנסות פרטי","הוצאות פרטי","מאזן פרטי","נטו כולל","יתרה"],
+    ...buildCFMap("all","all",cfPeriod).map(row=>{const net=(row.bizInc+row.privInc)-(row.bizExp+row.privExp);cum+=net;return[row.label,row.bizInc,row.bizExp,row.bizInc-row.bizExp,row.privInc,row.privExp,row.privInc-row.privExp,net,cum]})];
+  XLSX.utils.book_append_sheet(wb,XLSX.utils.aoa_to_sheet(cd),"תזרים מזומנים");
+  XLSX.writeFile(wb,"דוח_פיננסי_"+new Date().toLocaleDateString("he-IL").replace(/\//g,"-")+".xlsx");
+}
+function exportCFExcel(){
+  const wb=XLSX.utils.book_new();
+  const ob=accounts.reduce((s,a)=>s+a.opening,0);let cum=ob;
+  const cfA=el("cf-acct")?el("cf-acct").value:"all";
+  const cfB=el("cf-bp")?el("cf-bp").value:"all";
+  const d=[...getHdr(),["תקופה","הכנסות עסקי","הוצאות עסקי","רווח עסקי","הכנסות פרטי","הוצאות פרטי","מאזן פרטי","נטו כולל","יתרה"],
+    ...buildCFMap(cfA,cfB,cfPeriod).map(row=>{const net=(row.bizInc+row.privInc)-(row.bizExp+row.privExp);cum+=net;return[row.label,row.bizInc,row.bizExp,row.bizInc-row.bizExp,row.privInc,row.privExp,row.privInc-row.privExp,net,cum]})];
+  XLSX.utils.book_append_sheet(wb,XLSX.utils.aoa_to_sheet(d),"תזרים");
+  XLSX.writeFile(wb,"תזרים_"+new Date().toLocaleDateString("he-IL").replace(/\//g,"-")+".xlsx");
+}
+
+// ══════ SYNC & REFRESH ══════
+function syncSelects(){
+  const o=["<option value=''>-- ללא --</option>",...accounts.map(a=>`<option value="${a.id}">${a.name}</option>`)].join("");
+  if(el("r-acct"))el("r-acct").innerHTML=o;
+  if(el("import-acct-sel"))el("import-acct-sel").innerHTML="<option value=''>-- בחר --</option>"+accounts.map(a=>`<option value="${a.id}">${a.name}</option>`).join("");
+  const fa=["<option value=''>כל החשבונות</option>",...accounts.map(a=>`<option value="${a.id}">${a.name}</option>`)].join("");
+  if(el("flt-acct"))el("flt-acct").innerHTML=fa;
+  if(el("cf-acct"))el("cf-acct").innerHTML="<option value='all'>כל החשבונות</option>"+accounts.map(a=>`<option value="${a.id}">${a.name}</option>`).join("");
+  buildChips("rec-acct-bar",recAcct,(id,btn)=>setRecAcct(id,btn));
+}
+function refreshAll(){
+  if(!currentUser)return;
+  updateLabels();syncSelects();renderAccounts();renderRecords();
+  renderReconcile();renderCF();refreshDashboard();showDupBanner();updateHomeStats();
+}
+
+// ══════ INIT ══════
+document.addEventListener('DOMContentLoaded',()=>{
+  if(el("r-date"))el("r-date").value=new Date().toISOString().slice(0,10);
+  refreshCatSelect();
+});
+</script>
+</body>
+</html>
