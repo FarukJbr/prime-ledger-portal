@@ -205,6 +205,7 @@ h2{font-size:16px;font-weight:800;margin-bottom:4px}
 #print-header-text .ph-client{font-size:13px;font-weight:700;color:#1e5fa8;margin-top:3px}
 #print-header-text .ph-date{font-size:10px;color:#888}
 #print-footer{display:none;text-align:center;font-size:9px;color:#aaa;margin-top:14px;padding-top:6px;border-top:1px solid #ddd}
+  @keyframes slideUp{from{opacity:0;transform:translateY(20px)}to{opacity:1;transform:translateY(0)}}
 </style>
 </head>
 <body>
@@ -460,10 +461,11 @@ h2{font-size:16px;font-weight:800;margin-bottom:4px}
                 <div><div class="form-label">שם</div><input id="acct-name" placeholder="שם החשבון"></div>
                 <div><div class="form-label">סוג</div><select id="acct-type"><option value="bank">🏦 חשבון בנק</option><option value="cc">💳 כרטיס אשראי</option></select></div>
               </div>
-              <div class="form-grid" style="grid-template-columns:1fr auto;align-items:end">
-                <div><div class="form-label">יתרת פתיחה (₪)</div><input type="number" id="acct-opening" placeholder="0"></div>
-                <button class="btn-solid" onclick="addAccount()" style="height:34px">+ הוסף</button>
-              </div>
+              <div class="form-grid" style="grid-template-columns:1fr 1fr">
+  <div><div class="form-label">יתרת פתיחה (₪)</div><input type="number" id="acct-opening" placeholder="0"></div>
+  <div><div class="form-label">מסגרת אשראי (₪) — אופציונלי</div><input type="number" id="acct-limit" placeholder="0 = ללא מסגרת"></div>
+</div>
+<button class="btn-solid" onclick="addAccount()" style="width:100%;margin-top:6px">+ הוסף חשבון</button>
             </div>
             <div class="card"><div class="sec-title">חשבונות <span id="acct-count" style="color:var(--muted);font-size:11px"></span></div><div id="accts-list"><div style="color:var(--muted);font-size:12px">אין חשבונות</div></div></div>
           </div>
@@ -984,12 +986,57 @@ function setRecordBP(bp){recordBP=bp;if(el("rbp-biz"))el("rbp-biz").classList.to
 // ── ACCOUNTS ──
 function addAccount(){
   const name=el("acct-name").value.trim();if(!name){alert("נא להזין שם");return}
-  accounts.push({id:"acct-"+Date.now(),name,type:el("acct-type").value,opening:parseFloat(el("acct-opening").value)||0,color:COLORS[accounts.length%COLORS.length]});
-  el("acct-name").value="";el("acct-opening").value="";save();refreshAll();
+  accounts.push({
+    id:"acct-"+Date.now(),
+    name,
+    type:el("acct-type").value,
+    opening:parseFloat(el("acct-opening").value)||0,
+    limit:parseFloat(el("acct-limit").value)||0,
+    color:COLORS[accounts.length%COLORS.length]
+  });
+  el("acct-name").value="";
+  el("acct-opening").value="";
+  el("acct-limit").value="";
+  save();refreshAll();
 }
 function deleteAccount(id){
   if(!confirm("למחוק?"))return;
   accounts=accounts.filter(a=>a.id!==id);bankRows=bankRows.filter(r=>r.acctId!==id);save();refreshAll();
+}
+  // מעקב אזהרות שכבר נשלחו (כדי לא לחזור על כל רענון)
+const sentWarnings=new Set();
+
+function checkLimitWarning(acct,remainPct,remaining){
+  const key=acct.id+'-'+Math.floor(remainPct/5); // אזהרה פעם אחת לכל 5%
+  if(sentWarnings.has(key))return;
+  sentWarnings.add(key);
+  // הצג toast אזהרה
+  showToast(
+    remainPct<=15?"🚨 אזהרה קריטית":"⚠️ אזהרה מסגרת",
+    `חשבון "${acct.name}": נותרו רק ${remainPct}% מהמסגרת (${fmt(remaining)})`,
+    remainPct<=15?"#ef4444":"#f59e0b"
+  );
+}
+
+function showToast(title,msg,color){
+  // הסר toast קיים
+  const old=document.getElementById('limit-toast');if(old)old.remove();
+  const toast=document.createElement('div');
+  toast.id='limit-toast';
+  toast.style.cssText=`position:fixed;bottom:20px;left:20px;right:20px;max-width:380px;margin:auto;
+    background:var(--card);border:2px solid ${color};border-radius:10px;padding:12px 16px;
+    z-index:9999;box-shadow:0 8px 30px #00000060;animation:slideUp .3s ease`;
+  toast.innerHTML=`
+    <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:10px">
+      <div>
+        <div style="font-weight:800;font-size:13px;color:${color};margin-bottom:3px">${title}</div>
+        <div style="font-size:12px;color:var(--muted2)">${msg}</div>
+      </div>
+      <button onclick="this.parentElement.parentElement.remove()" style="background:none;border:none;color:var(--muted);cursor:pointer;font-size:16px;padding:0;flex-shrink:0">✕</button>
+    </div>`;
+  document.body.appendChild(toast);
+  // סגור אוטומטית אחרי 8 שניות
+  setTimeout(()=>{if(toast.parentElement)toast.remove()},8000);
 }
 function renderAccounts(){
   if(!el("acct-count"))return;
