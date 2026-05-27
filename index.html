@@ -355,10 +355,10 @@ h2{font-size:16px;font-weight:800;margin-bottom:4px}
       <div class="sidebar-section" id="admin-sb-section" style="display:none">ניהול מנהל</div>
       <button class="side-btn" id="admin-sb-btn" style="display:none" onclick="switchPortalTab('admin',this)"><span class="side-icon">👑</span> פאנל מנהל</button>
       <div class="sidebar-section">בקרוב</div>
-      <button class="side-btn" onclick="switchPortalTab('pl',this)"><span class="side-icon">📊</span> רווח והפסד <span class="side-badge">בקרוב</span></button>
+      <button class="side-btn" onclick="switchPortalTab('pl',this)"><span class="side-icon">📊</span> דוחות שנתיים 1301 <span class="side-badge">בקרוב</span></button>
       <button class="side-btn" onclick="switchPortalTab('balance',this)"><span class="side-icon">⚖️</span> מאזן <span class="side-badge">בקרוב</span></button>
-      <button class="side-btn" onclick="switchPortalTab('vat',this)"><span class="side-icon">🧾</span> מע"מ <span class="side-badge">בקרוב</span></button>
-      <button class="side-btn" onclick="switchPortalTab('salary',this)"><span class="side-icon">👷</span> שכר <span class="side-badge">בקרוב</span></button>
+      <button class="side-btn" onclick="switchPortalTab('vat',this)"><span class="side-icon">🧾</span> חדשות ועדכונים מע"מ / מס <span class="side-badge">בקרוב</span></button>
+      <button class="side-btn" onclick="switchPortalTab('salary',this)"><span class="side-icon">👷</span> חשבות שכר <span class="side-badge">בקרוב</span></button>
       <div class="sidebar-section">הגדרות</div>
       <button class="side-btn" onclick="openSettings()"><span class="side-icon">⚙️</span> הגדרות</button>
     </div>
@@ -715,6 +715,8 @@ function doRegister(){
   const terms=document.getElementById('reg-terms').checked;
   const err=document.getElementById('reg-error'),info=document.getElementById('reg-info');
   err.style.display='none';info.style.display='none';
+  role:'user',
+subscription:'free',
   if(!usageEl){err.textContent='יש לבחור סוג שימוש';err.style.display='block';return}
   const usage=usageEl.value;
   if(!name||!email||!pass||!phone){err.textContent='יש למלא את כל שדות החובה (*)';err.style.display='block';return}
@@ -987,13 +989,21 @@ function setRecordBP(bp){recordBP=bp;if(el("rbp-biz"))el("rbp-biz").classList.to
 function addAccount(){
   const name=el("acct-name").value.trim();if(!name){alert("נא להזין שם");return}
   accounts.push({
-    id:"acct-"+Date.now(),
-    name,
-    type:el("acct-type").value,
-    opening:parseFloat(el("acct-opening").value)||0,
-    limit:parseFloat(el("acct-limit").value)||0,
-    color:COLORS[accounts.length%COLORS.length]
-  });
+    accounts.push({
+  id:"acct-"+Date.now(),
+  name,
+  type:el("acct-type").value,
+  opening:parseFloat(el("acct-opening").value)||0,
+  <input
+  type="number"
+  id="acct-limit"
+  placeholder="מסגרת אשראי / עו״ש">
+  color:COLORS[accounts.length%COLORS.length],
+
+  creditLimit:parseFloat(el("acct-limit")?.value)||0,
+  warningThreshold:30,
+  warningSent:false
+});
   el("acct-name").value="";
   el("acct-opening").value="";
   el("acct-limit").value="";
