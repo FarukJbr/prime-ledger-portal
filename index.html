@@ -1232,7 +1232,7 @@ function doLogout(){
   document.getElementById('login-pass').value='';
 }
 
-function enterPortal(){
+async function enterPortal(){
   document.getElementById('auth-screen').style.display='none';
   document.getElementById('portal-screen').classList.add('visible');
   document.getElementById('portal-user-avatar').textContent=(currentUser.name||'?').charAt(0).toUpperCase();
@@ -1250,7 +1250,7 @@ function enterPortal(){
   if(imgEl) imgEl.src = document.getElementById('print-logo').src;
   loadUserLogo();
   applyUsageMode();
-  loadUserData();
+  await loadUserData();
   clientName = currentUser.biz||currentUser.name||'';
   refreshAll();
   renderPlansTab();
@@ -1994,13 +1994,59 @@ function exportUsersPDF(){
 
 // ── FINANCIAL DATA ──
 function getKey(){ return 'fin_'+(currentUser?currentUser.email:'guest'); }
-function saveUserData(){ try{ localStorage.setItem(getKey(), JSON.stringify({accounts,bankRows,records,clientName,uploadHistory})); }catch(e){} }
-function loadUserData(){
+async function saveUserData(){
+  if(!sb || !currentUser){ try{ localStorage.setItem(getKey(), JSON.stringify({accounts,bankRows,records,clientName,uploadHistory})); }catch(e){} return; }
+  const email = currentUser.email;
   try{
-    const d=JSON.parse(localStorage.getItem(getKey())||'null');
-    if(d){ accounts=d.accounts||[]; bankRows=d.bankRows||[]; records=d.records||[]; clientName=d.clientName||''; uploadHistory=d.uploadHistory||[]; }
-    else{ accounts=[]; bankRows=[]; records=[]; clientName=''; uploadHistory=[]; }
-  }catch(e){ accounts=[]; bankRows=[]; records=[]; clientName=''; uploadHistory=[]; }
+    // Full-replace sync (same "this is the complete truth" model the old
+    // localStorage write used) — children deleted before parent to respect FKs.
+    await sb.from('portal_records').delete().eq('client_email', email);
+    await sb.from('portal_bank_rows').delete().eq('client_email', email);
+    await sb.from('portal_accounts').delete().eq('client_email', email);
+    if(accounts.length) await sb.from('portal_accounts').insert(accounts.map(a=>({
+      id:a.id, client_email:email, name:a.name||'', type:a.type||'bank',
+      opening:a.opening||0, credit_limit:a.limit||0, color:a.color||'#3b82f6'
+    })));
+    if(bankRows.length) await sb.from('portal_bank_rows').insert(bankRows.map(r=>({
+      id:r.id, client_email:email, acct_id:r.acctId||null,
+      row_date: r.date instanceof Date ? r.date.toISOString() : String(r.date||''),
+      description:r.description||'', debit:r.debit||0, credit:r.credit||0,
+      matched:!!r.matched, manual_entry_id:r.manualEntryId||null, bp:r.bp||'biz'
+    })));
+    if(records.length) await sb.from('portal_records').insert(records.map(r=>({
+      id:r.id, client_email:email, record_date:String(r.date||''),
+      description:r.description||'', amount:r.amount||0, type:r.type, bp:r.bp||'biz',
+      category:r.category||'', acct_id:r.acctId||null, matched:!!r.matched, bank_row_id:r.bankRowId||null
+    })));
+    await sb.from('portal_users').update({display_name:clientName||null, upload_history:uploadHistory||[]}).eq('email', email);
+  }catch(e){ console.error('saveUserData sync error', e); }
+}
+async function loadUserData(){
+  if(!sb || !currentUser){
+    try{
+      const d=JSON.parse(localStorage.getItem(getKey())||'null');
+      if(d){ accounts=d.accounts||[]; bankRows=d.bankRows||[]; records=d.records||[]; clientName=d.clientName||''; uploadHistory=d.uploadHistory||[]; }
+      else{ accounts=[]; bankRows=[]; records=[]; clientName=''; uploadHistory=[]; }
+    }catch(e){ accounts=[]; bankRows=[]; records=[]; clientName=''; uploadHistory=[]; }
+    return;
+  }
+  const email = currentUser.email;
+  try{
+    const [{data:accD},{data:bankD},{data:recD},{data:userD}] = await Promise.all([
+      sb.from('portal_accounts').select('*').eq('client_email',email),
+      sb.from('portal_bank_rows').select('*').eq('client_email',email),
+      sb.from('portal_records').select('*').eq('client_email',email),
+      sb.from('portal_users').select('display_name,upload_history').eq('email',email).maybeSingle()
+    ]);
+    accounts = (accD||[]).map(a=>({id:a.id,name:a.name,type:a.type,opening:Number(a.opening)||0,limit:Number(a.credit_limit)||0,color:a.color}));
+    bankRows = (bankD||[]).map(r=>({id:r.id,acctId:r.acct_id,date:r.row_date,description:r.description,debit:Number(r.debit)||0,credit:Number(r.credit)||0,matched:!!r.matched,manualEntryId:r.manual_entry_id,bp:r.bp}));
+    records = (recD||[]).map(r=>({id:r.id,date:r.record_date,description:r.description,amount:Number(r.amount)||0,type:r.type,bp:r.bp,category:r.category,acctId:r.acct_id,matched:!!r.matched,bankRowId:r.bank_row_id}));
+    clientName = userD?.display_name || '';
+    uploadHistory = userD?.upload_history || [];
+  }catch(e){
+    console.error('loadUserData fetch error', e);
+    accounts=[]; bankRows=[]; records=[]; clientName=''; uploadHistory=[];
+  }
 }
 
 let clientName='', accounts=[], bankRows=[], records=[], uploadHistory=[];
