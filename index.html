@@ -256,11 +256,11 @@ h2{font-size:16px;font-weight:800;margin-bottom:4px}
       <h4 style="color:var(--text);margin-bottom:6px;margin-top:12px">3. אבטחת מידע</h4>
       <p>המידע מאובטח. איננו מוכרים או מעבירים מידע לצדדים שלישיים ללא הסכמה, למעט כנדרש על פי חוק.</p>
       <h4 style="color:var(--text);margin-bottom:6px;margin-top:12px">4. זכויות המשתמש</h4>
-      <p>יש לך זכות לעיין, לתקן או לבקש מחיקת מידע אישי. לפנייה: info@primesolutionfinance.com</p>
+      <p>יש לך זכות לעיין, לתקן או לבקש מחיקת מידע אישי. לפנייה: info@primels.co.il</p>
       <h4 style="color:var(--text);margin-bottom:6px;margin-top:12px">5. שימוש מותר</h4>
       <p>הפורטל מיועד ללקוחות פריים לדג'ר בלבד. חל איסור להעביר פרטי גישה לצד שלישי.</p>
       <h4 style="color:var(--text);margin-bottom:6px;margin-top:12px">6. יצירת קשר</h4>
-      <p>📧 info@primesolutionfinance.com | 📱 055-502-7988</p>
+      <p>📧 info@primels.co.il | 📱 055-502-7988</p>
     </div>
     <button class="btn-solid" onclick="closeTerms()" style="width:100%">✅ הבנתי וסגור</button>
   </div>
@@ -391,7 +391,7 @@ h2{font-size:16px;font-weight:800;margin-bottom:4px}
       <label class="auth-form-label">סיסמה</label>
       <input class="auth-input" type="password" id="login-pass" placeholder="••••••••" onkeydown="if(event.key==='Enter')doLogin()">
       <button class="auth-btn" onclick="doLogin()">כניסה לפורטל →</button>
-      <div style="text-align:center;margin-top:14px;font-size:11px;color:var(--muted)">תמיכה: 055-502-7988 | info@primesolutionfinance.com</div>
+      <div style="text-align:center;margin-top:14px;font-size:11px;color:var(--muted)">תמיכה: 055-502-7988 | info@primels.co.il</div>
     </div>
     <div id="auth-register" style="display:none">
       <div id="reg-error" class="auth-error"></div>
@@ -453,11 +453,11 @@ h2{font-size:16px;font-weight:800;margin-bottom:4px}
       <button class="side-btn active" onclick="switchPortalTab('home',this)"><span class="side-icon">🏠</span> ראשי</button>
       <button class="side-btn" onclick="switchPortalTab('cashflow',this)"><span class="side-icon">💹</span> תזרים מזומנים</button>
       <div class="sidebar-section" id="admin-sb-section" style="display:none">ניהול מנהל</div>
-      <button class="side-btn" id="admin-sb-btn" style="display:none" onclick="switchPortalTab('admin',this)"><span class="side-icon">👑</span> פאנל מנהל</button>
+      <button class="side-btn" id="admin-sb-btn" style="display:none" onclick="switchPortalTab('admin',this)"><span class="side-icon">👑</span> פאנל מנהל <span class="side-badge" id="admin-badge-count" style="display:none">0</span></button>
       <div class="sidebar-section">מידע</div>
       <button class="side-btn" onclick="switchPortalTab('legal',this)"><span class="side-icon">📋</span> מסמכים משפטיים</button>
-      <button class="side-btn" onclick="switchPortalTab('plans',this)"><span class="side-icon">💳</span> מנויים ותמחור</button>
-      <button class="side-btn" onclick="switchPortalTab('referral',this)"><span class="side-icon">🎁</span> הפניית חברים</button>
+      <button class="side-btn" id="plans-sb-btn" onclick="switchPortalTab('plans',this)"><span class="side-icon">💳</span> מנויים ותמחור</button>
+      <button class="side-btn" id="referral-sb-btn" onclick="switchPortalTab('referral',this)"><span class="side-icon">🎁</span> הפניית חברים</button>
       <div class="sidebar-section">בקרוב</div>
       <button class="side-btn" onclick="switchPortalTab('pl',this)"><span class="side-icon">📊</span> דוחות שנתיים <span class="side-badge">בקרוב</span></button>
       <button class="side-btn" onclick="switchPortalTab('balance',this)"><span class="side-icon">⚖️</span> מאזן <span class="side-badge">בקרוב</span></button>
@@ -521,7 +521,7 @@ h2{font-size:16px;font-weight:800;margin-bottom:4px}
         <div class="card" style="border-color:#1e5fa840">
           <div class="sec-title" style="color:var(--brand)">📞 יצירת קשר</div>
           <div style="font-size:13px;color:var(--muted2);line-height:2">
-            <div>📧 info@primesolutionfinance.com</div>
+            <div>📧 info@primels.co.il</div>
             <div>📱 055-502-7988</div>
             <div>🕐 א'-ה' 9:00-17:00</div>
           </div>
@@ -901,7 +901,7 @@ h2{font-size:16px;font-weight:800;margin-bottom:4px}
             <h4>5. שינויים בתנאים</h4>
             <p>אנו שומרים לעצמנו זכות לעדכן תנאים אלה. עדכונים מהותיים יימסרו מראש.</p>
             <h4>6. יצירת קשר</h4>
-            <p>📧 info@primesolutionfinance.com | 📱 055-502-7988 | א'-ה' 9:00-17:00</p>
+            <p>📧 info@primels.co.il | 📱 055-502-7988 | א'-ה' 9:00-17:00</p>
           </div>
         </div>
         <div id="legal-privacy" class="legal-section">
@@ -929,7 +929,7 @@ h2{font-size:16px;font-weight:800;margin-bottom:4px}
             <h4>רמת נגישות</h4>
             <p>הפורטל מיועד לעמוד בתקן WCAG 2.1 ברמה AA. אנו ממשיכים לשפר את הנגישות באופן שוטף.</p>
             <h4>פנייה בנושא נגישות</h4>
-            <p>אם נתקלת בבעיית נגישות כלשהי, אנא פנה אלינו:<br>📧 info@primesolutionfinance.com | 📱 055-502-7988</p>
+            <p>אם נתקלת בבעיית נגישות כלשהי, אנא פנה אלינו:<br>📧 info@primels.co.il | 📱 055-502-7988</p>
           </div>
         </div>
         <div id="legal-refund" class="legal-section">
@@ -942,7 +942,7 @@ h2{font-size:16px;font-weight:800;margin-bottom:4px}
             <h4>3. שינוי תוכנית</h4>
             <p>ניתן לשנות תוכנית מנוי בכל עת. שדרוג ייכנס לתוקף מיידית. שינמוך ייכנס לתוקף בתחילת תקופת החיוב הבאה.</p>
             <h4>4. יצירת קשר</h4>
-            <p>לבקשות ביטול והחזר: 📧 info@primesolutionfinance.com | 📱 055-502-7988</p>
+            <p>לבקשות ביטול והחזר: 📧 info@primels.co.il | 📱 055-502-7988</p>
           </div>
         </div>
       </div>
@@ -964,7 +964,7 @@ h2{font-size:16px;font-weight:800;margin-bottom:4px}
         <div class="card" style="border-color:#1e5fa840">
           <div class="sec-title" style="color:var(--brand)">📞 שאלות לפני שדרוג?</div>
           <div style="font-size:13px;color:var(--muted2);line-height:2">
-            <div>📧 info@primesolutionfinance.com</div>
+            <div>📧 info@primels.co.il</div>
             <div>📱 055-502-7988</div>
             <div>🕐 א'-ה' 9:00-17:00</div>
           </div>
@@ -1224,6 +1224,8 @@ async function doRegister(){
 
 function doLogout(){
   currentUser=null;
+  if(adminNotifyInterval){ clearInterval(adminNotifyInterval); adminNotifyInterval=null; }
+  document.title = ORIGINAL_TITLE;
   document.getElementById('auth-screen').style.display='flex';
   document.getElementById('portal-screen').classList.remove('visible');
   document.getElementById('login-email').value='';
@@ -1241,6 +1243,8 @@ function enterPortal(){
   if(currentUser.role==='admin'){
     document.getElementById('admin-sb-section').style.display='block';
     document.getElementById('admin-sb-btn').style.display='flex';
+    document.getElementById('plans-sb-btn').style.display='none';
+    document.getElementById('referral-sb-btn').style.display='none';
   }
   const imgEl = document.getElementById('portal-logo-img');
   if(imgEl) imgEl.src = document.getElementById('print-logo').src;
@@ -1260,6 +1264,30 @@ function enterPortal(){
     renderAdminAnnouncements();
     renderAdminReferrals();
     renderAdminChatList();
+    checkAdminNotifications();
+    if(adminNotifyInterval) clearInterval(adminNotifyInterval);
+    adminNotifyInterval = setInterval(checkAdminNotifications, 30000); // poll every 30s while portal tab is open
+  }
+}
+
+// ── ADMIN NOTIFICATIONS ──
+// NOTE: this only alerts the admin while the portal tab is actually open in a
+// browser (badge + tab title). It is NOT a push/email/SMS alert that reaches you
+// when the site is closed — that would need a separate email/SMS integration.
+let adminNotifyInterval = null;
+const ORIGINAL_TITLE = document.title;
+async function checkAdminNotifications(){
+  if(!sb || !currentUser || currentUser.role!=='admin') return;
+  const {data} = await sb.from('portal_users').select('email').eq('upgrade_requested',true);
+  const count = data ? data.length : 0;
+  const badge = document.getElementById('admin-badge-count');
+  if(count>0){
+    badge.textContent = count;
+    badge.style.display = 'inline-block';
+    document.title = `(${count}) ${ORIGINAL_TITLE}`;
+  } else {
+    badge.style.display = 'none';
+    document.title = ORIGINAL_TITLE;
   }
 }
 
@@ -1352,6 +1380,7 @@ function switchLegal(name,btn){
 
 // ── FEATURE GATING & UPGRADE FLOW ──
 function hasFeature(name){
+  if(currentUser?.role==='admin') return true; // admin access is a role, not a subscription plan
   const plan = PLANS[currentUser?.plan||'free']||PLANS.free;
   return !!plan.features[name];
 }
@@ -1368,7 +1397,7 @@ function openUpgradeModal(msg){
   } else {
     el('upgrade-modal-body').innerHTML = `<div style="background:var(--surface);border-radius:8px;padding:12px;font-size:12px;color:var(--muted2);line-height:1.8;margin-top:8px">
       💳 לאחר השליחה ניצור איתך קשר לתיאום תשלום (₪49/חודש), ולאחר אישור התשלום נעדכן את המנוי שלך באופן ידני.<br>
-      📧 info@primesolutionfinance.com · 📱 055-502-7988</div>`;
+      📧 info@primels.co.il · 📱 055-502-7988</div>`;
     cta.style.display='block';
   }
   el('upgrade-modal').classList.add('open');
@@ -1830,12 +1859,14 @@ function adminApproveUpgrade(email){
   users[email].upgradeApprovedAt=new Date().toISOString();
   saveUsers(users);
   renderAdminPanel();
+  checkAdminNotifications();
 }
 function adminDismissUpgrade(email){
   const users=getUsers(); if(!users[email]) return;
   users[email].upgradeRequested=false;
   saveUsers(users);
   renderAdminPanel();
+  checkAdminNotifications();
 }
 function openEditUser(email){
   const users=getUsers();
@@ -2039,7 +2070,7 @@ function setRecordBP(bp){ recordBP=bp; if(el("rbp-biz"))el("rbp-biz").classList.
 // ── ACCOUNTS ──
 function addAccount(){
   const plan = PLANS[currentUser?.plan||'free']||PLANS.free;
-  if(accounts.length>=plan.features.accounts){
+  if(currentUser?.role!=='admin' && accounts.length>=plan.features.accounts){
     openUpgradeModal(`הגעת למספר החשבונות המקסימלי במנוי ${plan.name} (${plan.features.accounts}). שדרג למקצועי לחשבונות ללא הגבלה.`);
     return;
   }
@@ -2160,7 +2191,7 @@ function setDashPeriod(v,btn){dashPeriod=v;document.querySelectorAll("#tab-dashb
 // ── RECORDS ──
 function addRecord(){
   const plan = PLANS[currentUser?.plan||'free']||PLANS.free;
-  if(records.length>=plan.features.records){
+  if(currentUser?.role!=='admin' && records.length>=plan.features.records){
     openUpgradeModal(`הגעת למספר הרישומים המקסימלי במנוי ${plan.name} (${plan.features.records}). שדרג למקצועי לרישומים ללא הגבלה.`);
     return;
   }
