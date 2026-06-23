@@ -303,7 +303,17 @@ h2{font-size:16px;font-weight:800;margin-bottom:4px}
   </div>
 </div>
 
-<!-- EDIT USER MODAL -->
+<!-- UPGRADE MODAL -->
+<div class="modal-bg" id="upgrade-modal" onclick="if(event.target===this)closeUpgradeModal()">
+  <div class="modal">
+    <div style="font-size:32px;text-align:center;margin-bottom:6px">🚀</div>
+    <h2 style="text-align:center">שדרוג למנוי מקצועי</h2>
+    <p class="subtitle" style="text-align:center" id="upgrade-modal-msg">פתח חשבונות ורישומים ללא הגבלה, ייצוא Excel והדפסה</p>
+    <div id="upgrade-modal-body"></div>
+    <button class="btn-solid" onclick="requestUpgrade()" style="width:100%;margin-top:10px" id="upgrade-modal-cta">📤 שלח בקשת שדרוג</button>
+    <button class="btn btn-sm" onclick="closeUpgradeModal()" style="width:100%;margin-top:8px">סגור</button>
+  </div>
+</div>
 <div class="modal-bg" id="edit-user-modal" onclick="if(event.target===this)closeEditUser()">
   <div class="modal">
     <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px">
@@ -727,6 +737,13 @@ h2{font-size:16px;font-weight:800;margin-bottom:4px}
           <div class="admin-stat"><div class="admin-stat-val" id="adm-active" style="color:#10b981">0</div><div class="admin-stat-lbl">פעילים</div></div>
           <div class="admin-stat"><div class="admin-stat-val" id="adm-blocked" style="color:#ef4444">0</div><div class="admin-stat-lbl">חסומים</div></div>
           <div class="admin-stat"><div class="admin-stat-val" id="adm-pro" style="color:#8b5cf6">0</div><div class="admin-stat-lbl">מנוי PRO</div></div>
+          <div class="admin-stat"><div class="admin-stat-val" id="adm-upgrade-req" style="color:#f59e0b">0</div><div class="admin-stat-lbl">בקשות שדרוג</div></div>
+        </div>
+
+        <!-- PENDING UPGRADE REQUESTS -->
+        <div class="card no-print" id="adm-upgrade-card" style="display:none;border-color:#f59e0b50">
+          <div class="sec-title" style="color:#f59e0b">🔔 בקשות שדרוג ממתינות</div>
+          <div id="adm-upgrade-list"></div>
         </div>
 
         <!-- ADD USER -->
@@ -876,7 +893,7 @@ h2{font-size:16px;font-weight:800;margin-bottom:4px}
           </div>
         </div>
         <div class="card" style="border-color:#1e5fa840">
-          <div class="sec-title" style="color:var(--brand)">📞 לשדרוג מנוי</div>
+          <div class="sec-title" style="color:var(--brand)">📞 שאלות לפני שדרוג?</div>
           <div style="font-size:13px;color:var(--muted2);line-height:2">
             <div>📧 info@primesolutionfinance.com</div>
             <div>📱 055-502-7988</div>
@@ -910,13 +927,13 @@ const PLANS = {
     icon: '🆓',
     features: {
       accounts: 2,
-      records: 100,
+      records: 50,
       bankImport: true,
       reconcile: true,
       cashflow: true,
-      excel: true,
-      print: true,
-      support: 'בסיסית'
+      excel: false,
+      print: false,
+      support: 'בסיסית (מענה עד 48 שעות)'
     }
   },
   pro: {
@@ -935,7 +952,7 @@ const PLANS = {
       cashflow: true,
       excel: true,
       print: true,
-      support: 'מועדפת'
+      support: 'מועדפת (מענה עד 24 שעות + קו ישיר)'
     }
   }
 };
@@ -1138,6 +1155,44 @@ function switchLegal(name,btn){
   btn.classList.add('active');
 }
 
+// ── FEATURE GATING & UPGRADE FLOW ──
+function hasFeature(name){
+  const plan = PLANS[currentUser?.plan||'free']||PLANS.free;
+  return !!plan.features[name];
+}
+function openUpgradeModal(msg){
+  const u = currentUser;
+  el('upgrade-modal-msg').textContent = msg || 'פתח חשבונות ורישומים ללא הגבלה, ייצוא Excel והדפסה';
+  const cta = el('upgrade-modal-cta');
+  if(u && u.plan==='pro'){
+    el('upgrade-modal-body').innerHTML = '<div style="text-align:center;color:#8b5cf6;font-weight:700;padding:10px 0">⭐ אתה כבר במנוי המקצועי!</div>';
+    cta.style.display='none';
+  } else if(u && u.upgradeRequested){
+    el('upgrade-modal-body').innerHTML = '<div style="text-align:center;color:var(--accent);font-weight:700;padding:10px 0">✅ הבקשה שלך נשלחה — ניצור איתך קשר לתשלום ונשדרג בהקדם</div>';
+    cta.style.display='none';
+  } else {
+    el('upgrade-modal-body').innerHTML = `<div style="background:var(--surface);border-radius:8px;padding:12px;font-size:12px;color:var(--muted2);line-height:1.8;margin-top:8px">
+      💳 לאחר השליחה ניצור איתך קשר לתיאום תשלום (₪49/חודש), ולאחר אישור התשלום נעדכן את המנוי שלך באופן ידני.<br>
+      📧 info@primesolutionfinance.com · 📱 055-502-7988</div>`;
+    cta.style.display='block';
+  }
+  el('upgrade-modal').classList.add('open');
+}
+function closeUpgradeModal(){ el('upgrade-modal').classList.remove('open'); }
+function requestUpgrade(){
+  if(!currentUser || currentUser.role==='admin') return;
+  const users = getUsers();
+  if(users[currentUser.email]){
+    users[currentUser.email].upgradeRequested = true;
+    users[currentUser.email].upgradeRequestedAt = new Date().toISOString();
+    saveUsers(users);
+  }
+  currentUser.upgradeRequested = true;
+  currentUser.upgradeRequestedAt = new Date().toISOString();
+  openUpgradeModal();
+  renderPlansTab();
+}
+
 // ── PLANS TAB ──
 function renderPlansTab(){
   const userPlan = currentUser?.plan||'free';
@@ -1153,6 +1208,15 @@ function renderPlansTab(){
     grid.innerHTML = planKeys.map(key=>{
       const p = PLANS[key];
       const isCurrent = userPlan===key;
+      const showUpgradeBtn = key==='pro' && userPlan!=='pro';
+      let btnHtml='';
+      if(showUpgradeBtn){
+        if(currentUser?.upgradeRequested){
+          btnHtml = `<div style="margin-top:14px;text-align:center;background:#10b98118;border:1px solid #10b98140;border-radius:8px;padding:8px;font-size:12px;color:#10b981;font-weight:700">✅ בקשת השדרוג נשלחה</div>`;
+        } else {
+          btnHtml = `<button class="btn-solid" style="width:100%;margin-top:14px;background:${p.color}" onclick="openUpgradeModal()">🚀 שדרג עכשיו</button>`;
+        }
+      }
       return `<div style="border:2px solid ${isCurrent?p.color:' var(--border)'};border-radius:12px;padding:20px;background:${isCurrent?p.color+'10':'var(--card)'};position:relative">
         ${isCurrent?`<div style="position:absolute;top:10px;left:10px;background:${p.color};color:#fff;font-size:10px;font-weight:700;padding:2px 8px;border-radius:10px">המנוי שלך</div>`:''}
         <div style="font-size:28px;margin-bottom:8px">${p.icon}</div>
@@ -1162,9 +1226,11 @@ function renderPlansTab(){
           <div>🏦 חשבונות: ${p.features.accounts===999?'ללא הגבלה':p.features.accounts}</div>
           <div>📋 רישומים: ${p.features.records===99999?'ללא הגבלה':p.features.records}</div>
           <div>📥 ייבוא בנק: ${p.features.bankImport?'✅':'❌'}</div>
-          <div>📊 Excel: ${p.features.excel?'✅':'❌'}</div>
+          <div>📊 ייצוא Excel: ${p.features.excel?'✅':'❌ — מקצועי בלבד'}</div>
+          <div>🖨️ הדפסה/PDF: ${p.features.print?'✅':'❌ — מקצועי בלבד'}</div>
           <div>🎧 תמיכה: ${p.features.support}</div>
         </div>
+        ${btnHtml}
       </div>`;
     }).join('');
   }
@@ -1216,6 +1282,28 @@ function renderAdminPanel(){
   document.getElementById('adm-active').textContent=list.filter(([,u])=>!u.blocked).length;
   document.getElementById('adm-blocked').textContent=list.filter(([,u])=>u.blocked).length;
   document.getElementById('adm-pro').textContent=list.filter(([,u])=>(u.plan||'free')==='pro').length;
+  // Pending upgrade requests
+  const pending=list.filter(([,u])=>u.upgradeRequested);
+  document.getElementById('adm-upgrade-req').textContent=pending.length;
+  const upCard=document.getElementById('adm-upgrade-card'), upList=document.getElementById('adm-upgrade-list');
+  if(pending.length){
+    upCard.style.display='block';
+    upList.innerHTML=pending.map(([email,u])=>`
+      <div class="user-card" style="border-color:#f59e0b40">
+        <div class="user-card-top">
+          <div class="user-avatar">${(u.name||'?').charAt(0).toUpperCase()}</div>
+          <div class="user-info">
+            <div class="user-name">${u.name||'—'}</div>
+            <div class="user-meta">${email}${u.phone?' · '+u.phone:''}</div>
+            <div class="user-meta">בקשה מתאריך: ${u.upgradeRequestedAt?new Date(u.upgradeRequestedAt).toLocaleDateString('he-IL'):'-'}</div>
+          </div>
+        </div>
+        <div class="user-actions">
+          <button class="btn btn-sm" style="border-color:#10b981;color:#10b981" onclick="adminApproveUpgrade('${email}')">✅ אשר ושדרג (לאחר תשלום)</button>
+          <button class="btn btn-sm btn-red" onclick="adminDismissUpgrade('${email}')">✕ דחה</button>
+        </div>
+      </div>`).join('');
+  } else { upCard.style.display='none'; }
   // Fill plan filter dropdown
   const planSel=document.getElementById('adm-flt-plan');
   if(planSel && planSel.options.length<=1){
@@ -1245,6 +1333,7 @@ function renderAdminPanel(){
             <span class="sbadge ${isAdm?'sb-admin':'sb-user'}">${isAdm?'👑 מנהל':'👤 משתמש'}</span>
             <span class="sbadge ${u.plan==='pro'?'sb-pro':'sb-free'}">${plan.icon} ${plan.name}</span>
             <span class="sbadge ${u.blocked?'sb-blocked':'sb-active'}">${u.blocked?'🚫 חסום':'✅ פעיל'}</span>
+            ${u.upgradeRequested?'<span class="sbadge" style="background:#f59e0b20;color:#f59e0b">🔔 ממתין לשדרוג</span>':''}
           </div>
         </div>
       </div>
@@ -1257,6 +1346,20 @@ function renderAdminPanel(){
   }).join('');
 }
 
+function adminApproveUpgrade(email){
+  const users=getUsers(); if(!users[email]) return;
+  users[email].plan='pro';
+  users[email].upgradeRequested=false;
+  users[email].upgradeApprovedAt=new Date().toISOString();
+  saveUsers(users);
+  renderAdminPanel();
+}
+function adminDismissUpgrade(email){
+  const users=getUsers(); if(!users[email]) return;
+  users[email].upgradeRequested=false;
+  saveUsers(users);
+  renderAdminPanel();
+}
 function openEditUser(email){
   const users=getUsers();
   const u=users[email]; if(!u) return;
@@ -1455,6 +1558,11 @@ function setRecordBP(bp){ recordBP=bp; if(el("rbp-biz"))el("rbp-biz").classList.
 
 // ── ACCOUNTS ──
 function addAccount(){
+  const plan = PLANS[currentUser?.plan||'free']||PLANS.free;
+  if(accounts.length>=plan.features.accounts){
+    openUpgradeModal(`הגעת למספר החשבונות המקסימלי במנוי ${plan.name} (${plan.features.accounts}). שדרג למקצועי לחשבונות ללא הגבלה.`);
+    return;
+  }
   const name=el("acct-name").value.trim(); if(!name){alert("נא להזין שם");return;}
   accounts.push({id:"acct-"+Date.now(),name,type:el("acct-type").value,opening:parseFloat(el("acct-opening").value)||0,limit:parseFloat(el("acct-limit").value)||0,color:COLORS[accounts.length%COLORS.length]});
   el("acct-name").value=""; el("acct-opening").value=""; el("acct-limit").value="";
@@ -1571,6 +1679,11 @@ function setDashPeriod(v,btn){dashPeriod=v;document.querySelectorAll("#tab-dashb
 
 // ── RECORDS ──
 function addRecord(){
+  const plan = PLANS[currentUser?.plan||'free']||PLANS.free;
+  if(records.length>=plan.features.records){
+    openUpgradeModal(`הגעת למספר הרישומים המקסימלי במנוי ${plan.name} (${plan.features.records}). שדרג למקצועי לרישומים ללא הגבלה.`);
+    return;
+  }
   const desc=el("r-desc").value.trim(), amount=parseFloat(el("r-amount").value);
   if(!desc||isNaN(amount)||amount<=0){alert("נא למלא תיאור וסכום");return;}
   const exactDup=records.find(r=>r.description.trim().toLowerCase()===desc.toLowerCase()&&Math.abs(r.amount-amount)<0.01&&r.date===el("r-date").value&&r.type===recordType&&r.bp===recordBP);
@@ -1919,6 +2032,7 @@ function updateLabels(){
   const pl=el('print-logo'); if(pl&&lg) pl.src=lg;
 }
 function printSection(s){
+  if(!hasFeature('print')){ openUpgradeModal('הדפסה / ייצוא PDF כלולים במנוי המקצועי בלבד.'); return; }
   document.querySelectorAll(".tab-panel").forEach(p=>p.classList.remove("print-active"));
   if(el("tab-"+s)) el("tab-"+s).classList.add("print-active");
   window.print();
@@ -1934,6 +2048,7 @@ function switchTab(n,btn){
 // ── EXPORT ──
 function getHdr(){ const r=[["פריים לדג'ר | Prime Ledger — הנהלת חשבונות"]]; if(clientName) r.push(["לקוח: "+clientName]); r.push(["תאריך: "+new Date().toLocaleDateString("he-IL")],[]); return r; }
 function exportToExcel(){
+  if(!hasFeature('excel')){ openUpgradeModal('ייצוא לאקסל כלול במנוי המקצועי בלבד.'); return; }
   const wb=XLSX.utils.book_new();
   const d=[...getHdr(),["תאריך","תיאור","קטגוריה","סוג","עסקי/פרטי","חשבון","סכום","סטטוס"],
     ...records.map(r=>[r.date,r.description,r.category,r.type,r.bp==="biz"?"עסקי":"פרטי",aN(r.acctId),r.type==="הוצאה"?-r.amount:r.amount,r.matched?"מותאם":"ממתין"])];
@@ -1945,6 +2060,7 @@ function exportToExcel(){
   XLSX.writeFile(wb,"דוח_פיננסי_"+new Date().toLocaleDateString("he-IL").replace(/\//g,"-")+".xlsx");
 }
 function exportCFExcel(){
+  if(!hasFeature('excel')){ openUpgradeModal('ייצוא לאקסל כלול במנוי המקצועי בלבד.'); return; }
   const wb=XLSX.utils.book_new(); const ob=accounts.reduce((s,a)=>s+a.opening,0); let cum=ob;
   const cfA=el("cf-acct")?el("cf-acct").value:"all", cfB=el("cf-bp")?el("cf-bp").value:"all";
   const d=[...getHdr(),["תקופה","הכנסות עסקי","הוצאות עסקי","רווח עסקי","הכנסות פרטי","הוצאות פרטי","מאזן פרטי","נטו כולל","יתרה"],
