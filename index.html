@@ -507,6 +507,10 @@ h2{font-size:16px;font-weight:800;margin-bottom:4px}
           <!-- DASHBOARD -->
           <div id="tab-dashboard" class="tab-panel active">
             <h2>סקירה כללית</h2><p class="subtitle" id="dash-client-lbl">מצב פיננסי עדכני</p>
+            <div id="dash-limit-warnings" class="card" style="display:none;border-color:#ef444450">
+              <div class="sec-title" style="color:#ef4444">⚠️ התראות מסגרת אשראי</div>
+              <div id="limit-warnings-list"></div>
+            </div>
             <div class="acct-bar" id="dash-acct-bar"><span style="color:var(--muted);font-size:12px" class="no-print">חשבון:</span><button class="acct-chip all active" onclick="setDashAcct('all',this)">הכל</button></div>
             <div class="inner-tabs no-print" id="dash-view-tabs">
               <button class="itab active" onclick="setDashView('all',this)">הכל</button>
@@ -1460,21 +1464,64 @@ function deleteAccount(id){
   if(!confirm("למחוק?")) return;
   accounts=accounts.filter(a=>a.id!==id); bankRows=bankRows.filter(r=>r.acctId!==id); save(); refreshAll();
 }
+// Compute current balance for an account from scratch (opening + all activity).
+// Always derived fresh — never an incrementally-updated counter — so a negative
+// opening balance is reflected immediately, with no dependency on new transactions.
+function getAccountBalance(a){
+  const aR=records.filter(r=>r.acctId===a.id&&!r.bankRowId);
+  const aB=bankRows.filter(r=>r.acctId===a.id);
+  const inc=aR.filter(r=>r.type==="הכנסה").reduce((s,r)=>s+r.amount,0)+aB.reduce((s,r)=>s+r.credit,0);
+  const exp=aR.filter(r=>r.type==="הוצאה").reduce((s,r)=>s+r.amount,0)+aB.reduce((s,r)=>s+r.debit,0);
+  const bal=a.opening+inc-exp;
+  return {inc,exp,bal};
+}
+// Credit-limit usage for an account, based on the FULL current balance (bal),
+// not on raw expense totals — so an overdrawn opening balance counts toward
+// the limit immediately, even with zero transactions.
+function getLimitUsage(a,bal){
+  if(!a.limit||a.limit<=0) return null;
+  const used=Math.max(0,-bal);
+  const remaining=Math.max(0,a.limit-used);
+  const usedPct=Math.min(100,Math.round((used/a.limit)*100));
+  const remainPct=100-usedPct;
+  return {used,remaining,usedPct,remainPct,limit:a.limit};
+}
+function computeLimitWarnings(){
+  return accounts.filter(a=>a.limit>0).map(a=>{
+    const {bal}=getAccountBalance(a);
+    const lu=getLimitUsage(a,bal);
+    return lu?{...a,...lu}:null;
+  }).filter(w=>w&&w.remainPct<=30);
+}
+function renderDashboardLimitWarnings(){
+  const card=el("dash-limit-warnings"),list=el("limit-warnings-list");
+  if(!card||!list) return;
+  const warns=computeLimitWarnings();
+  if(!warns.length){card.style.display="none";return;}
+  card.style.display="block";
+  list.innerHTML=warns.map(w=>{
+    const color=w.remainPct<=15?'#ef4444':'#f59e0b';
+    return`<div class="card2" style="border-right:3px solid ${color};background:${color}12">
+      <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:5px">
+        <span style="font-weight:700">${w.remainPct<=15?'🚨':'⚠️'} ${w.name}</span>
+        <span style="color:${color};font-weight:800">${w.remainPct}% נותר</span>
+      </div>
+      <div style="font-size:11px;color:var(--muted);margin-top:4px">
+        נוצל <b style="color:${color}">${fmt(w.used)}</b> מתוך מסגרת <b style="color:var(--text)">${fmt(w.limit)}</b> · נותר <b style="color:var(--text)">${fmt(w.remaining)}</b>
+      </div>
+    </div>`;
+  }).join("");
+}
 function renderAccounts(){
   if(!el("acct-count")) return;
   el("acct-count").textContent=accounts.length+" חשבונות";
   if(!accounts.length){el("accts-list").innerHTML=`<div style="color:var(--muted);font-size:12px">אין חשבונות</div>`;return;}
   el("accts-list").innerHTML=accounts.map(a=>{
-    const aR=records.filter(r=>r.acctId===a.id&&!r.bankRowId);
-    const aB=bankRows.filter(r=>r.acctId===a.id);
-    const inc=aR.filter(r=>r.type==="הכנסה").reduce((s,r)=>s+r.amount,0)+aB.reduce((s,r)=>s+r.credit,0);
-    const exp=aR.filter(r=>r.type==="הוצאה").reduce((s,r)=>s+r.amount,0)+aB.reduce((s,r)=>s+r.debit,0);
-    const bal=a.opening+inc-exp;
+    const {inc,exp,bal}=getAccountBalance(a);
     let limitHtml='';
-    if(a.limit>0){
-      const usedPct=Math.min(100,Math.round((exp/a.limit)*100));
-      const remaining=a.limit-exp;
-      const remainPct=100-usedPct;
+    const lu=getLimitUsage(a,bal);
+    if(lu){
+      const {used,remaining,usedPct,remainPct}=lu;
       const barColor=remainPct<=15?'#ef4444':remainPct<=30?'#f59e0b':'#10b981';
       if(remainPct<=30) checkLimitWarning(a,remainPct,remaining);
       limitHtml=`<div class="limit-bar-wrap">
@@ -1817,6 +1864,7 @@ function renderCF(){
 // ── DASHBOARD ──
 function refreshDashboard(){
   buildChips("dash-acct-bar",dashAcct,(id,btn)=>setDashAcct(id,btn));
+  renderDashboardLimitWarnings();
   const af=dashAcct==="all"?null:dashAcct;
   const usage=currentUser?currentUser.usage||'biz':'biz';
   const effectiveView=usage==='priv'?'priv':dashView;
