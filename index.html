@@ -5,6 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>פריים לדג'ר | Prime Ledger — פורטל לקוחות</title>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
 <style>
 *{box-sizing:border-box;margin:0;padding:0}
 :root{--bg:#0b0f17;--surface:#111827;--card:#1a2234;--card2:#1e2840;--border:#2d3748;--accent:#10b981;--red:#ef4444;--yellow:#f59e0b;--blue2:#3b82f6;--purple:#8b5cf6;--brand:#1e5fa8;--brand2:#2563eb;--text:#f1f5f9;--muted:#64748b;--muted2:#94a3b8}
@@ -416,6 +417,8 @@ h2{font-size:16px;font-weight:800;margin-bottom:4px}
       <input class="auth-input" type="tel" id="reg-phone" placeholder="050-0000000">
       <label class="auth-form-label">סיסמה (לפחות 6 תווים) *</label>
       <input class="auth-input" type="password" id="reg-pass" placeholder="••••••••" onkeydown="if(event.key==='Enter')doRegister()">
+      <label class="auth-form-label">קוד הפניה (אופציונלי)</label>
+      <input class="auth-input" type="text" id="reg-ref-code" placeholder="PL______" style="text-transform:uppercase">
       <div class="terms-row">
         <input type="checkbox" id="reg-terms">
         <label for="reg-terms">קראתי ואני מסכים/ה ל<span class="terms-link" onclick="openTerms()">תנאי השימוש</span></label>
@@ -454,6 +457,7 @@ h2{font-size:16px;font-weight:800;margin-bottom:4px}
       <div class="sidebar-section">מידע</div>
       <button class="side-btn" onclick="switchPortalTab('legal',this)"><span class="side-icon">📋</span> מסמכים משפטיים</button>
       <button class="side-btn" onclick="switchPortalTab('plans',this)"><span class="side-icon">💳</span> מנויים ותמחור</button>
+      <button class="side-btn" onclick="switchPortalTab('referral',this)"><span class="side-icon">🎁</span> הפניית חברים</button>
       <div class="sidebar-section">בקרוב</div>
       <button class="side-btn" onclick="switchPortalTab('pl',this)"><span class="side-icon">📊</span> דוחות שנתיים <span class="side-badge">בקרוב</span></button>
       <button class="side-btn" onclick="switchPortalTab('balance',this)"><span class="side-icon">⚖️</span> מאזן <span class="side-badge">בקרוב</span></button>
@@ -475,6 +479,23 @@ h2{font-size:16px;font-weight:800;margin-bottom:4px}
             <div class="welcome-stat"><div class="welcome-stat-val" id="ws-unmatched" style="color:var(--yellow)">0</div><div class="welcome-stat-lbl">לא מותאם</div></div>
           </div>
         </div>
+        <!-- FINANCIAL HEALTH SCORE -->
+        <div class="card" id="health-card" style="border-color:#1e5fa840">
+          <div class="sec-title">🩺 בריאות פיננסית</div>
+          <div style="display:flex;align-items:center;gap:16px;flex-wrap:wrap">
+            <div style="position:relative;width:84px;height:84px;flex-shrink:0">
+              <svg width="84" height="84" viewBox="0 0 84 84" style="transform:rotate(-90deg)">
+                <circle cx="42" cy="42" r="36" fill="none" stroke="var(--surface)" stroke-width="9"></circle>
+                <circle id="health-ring" cx="42" cy="42" r="36" fill="none" stroke="#10b981" stroke-width="9" stroke-linecap="round" stroke-dasharray="226" stroke-dashoffset="226"></circle>
+              </svg>
+              <div style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center;font-weight:800;font-size:20px" id="health-score">--</div>
+            </div>
+            <div style="flex:1;min-width:160px">
+              <div id="health-label" style="font-weight:700;font-size:14px;margin-bottom:4px">מחשב...</div>
+              <div id="health-detail" style="color:var(--muted2);font-size:12px;line-height:1.7"></div>
+            </div>
+          </div>
+        </div>
         <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:12px">
           <div class="card" style="cursor:pointer;border-color:#1e5fa840;transition:.2s" onclick="switchPortalTab('cashflow',document.querySelectorAll('.side-btn')[1])" onmouseenter="this.style.borderColor='var(--brand)'" onmouseleave="this.style.borderColor='#1e5fa840'">
             <div style="font-size:28px;margin-bottom:8px">💹</div>
@@ -488,9 +509,14 @@ h2{font-size:16px;font-weight:800;margin-bottom:4px}
             <div class="coming-soon-badge" style="margin-top:8px">בקרוב</div>
           </div>
         </div>
+        <!-- REMINDERS -->
+        <div class="card" id="reminders-card" style="display:none;border-color:#f59e0b50">
+          <div class="sec-title" style="color:#f59e0b">⏰ תזכורות</div>
+          <div id="reminders-list"></div>
+        </div>
         <div class="card">
           <div class="sec-title">📣 עדכונים מהמשרד</div>
-          <div id="admin-messages"><div style="color:var(--muted2);font-size:14px;padding:8px 0;line-height:1.7">החל מתאריך 01.06.2026, בהתאם להנחיות רשות המסים, כל עסקה מעל 5,000 ש"ח תחויב בהפקת מספר הקצאה לפני הוצאת חשבונית מס.</div></div>
+          <div id="admin-messages"><div style="color:var(--muted2);font-size:14px;padding:8px 0;line-height:1.7">טוען עדכונים...</div></div>
         </div>
         <div class="card" style="border-color:#1e5fa840">
           <div class="sec-title" style="color:var(--brand)">📞 יצירת קשר</div>
@@ -746,6 +772,49 @@ h2{font-size:16px;font-weight:800;margin-bottom:4px}
           <div id="adm-upgrade-list"></div>
         </div>
 
+        <!-- PENDING REFERRAL REWARDS -->
+        <div class="card no-print" id="adm-referral-card" style="display:none;border-color:#10b98150">
+          <div class="sec-title" style="color:#10b981">🎁 הפניות שמחכות להטבה</div>
+          <div id="adm-referral-list"></div>
+        </div>
+
+        <!-- POST ANNOUNCEMENT -->
+        <div class="card no-print">
+          <div class="sec-title">📣 פרסום עדכון לכל הלקוחות</div>
+          <div class="form-grid" style="grid-template-columns:1fr">
+            <div><div class="form-label">כותרת</div><input id="adm-ann-title" placeholder="כותרת קצרה"></div>
+          </div>
+          <div class="form-grid" style="grid-template-columns:1fr">
+            <div><div class="form-label">תוכן</div><input id="adm-ann-msg" placeholder="תוכן ההודעה"></div>
+          </div>
+          <button class="btn-solid" onclick="adminPostAnnouncement()">📢 פרסם לכולם</button>
+          <div style="height:1px;background:var(--border);margin:12px 0"></div>
+          <div style="font-size:11px;color:var(--muted);margin-bottom:8px">עדכונים שפורסמו:</div>
+          <div id="adm-ann-list"></div>
+        </div>
+
+        <!-- SET PERSONAL REMINDER -->
+        <div class="card no-print">
+          <div class="sec-title">⏰ שלח תזכורת אישית ללקוח</div>
+          <div class="form-grid" style="grid-template-columns:1fr 1fr">
+            <div><div class="form-label">אימייל לקוח</div><input id="adm-rem-email" placeholder="client@email.com"></div>
+            <div><div class="form-label">תאריך יעד (אופציונלי)</div><input type="date" id="adm-rem-due"></div>
+          </div>
+          <div class="form-grid" style="grid-template-columns:1fr">
+            <div><div class="form-label">כותרת</div><input id="adm-rem-title" placeholder="למשל: נדרש תלוש שכר מרץ"></div>
+          </div>
+          <div class="form-grid" style="grid-template-columns:1fr">
+            <div><div class="form-label">פירוט</div><input id="adm-rem-msg" placeholder="פירוט נוסף (אופציונלי)"></div>
+          </div>
+          <button class="btn-solid" onclick="adminSetReminder()">⏰ שלח תזכורת</button>
+        </div>
+
+        <!-- CLIENT CHATS -->
+        <div class="card no-print">
+          <div class="sec-title">💬 שיחות עם לקוחות</div>
+          <div id="adm-chat-list"></div>
+        </div>
+
         <!-- ADD USER -->
         <div class="card no-print">
           <div class="sec-title">➕ הוסף לקוח חדש</div>
@@ -826,7 +895,7 @@ h2{font-size:16px;font-weight:800;margin-bottom:4px}
             <h4>2. שימוש מותר</h4>
             <p>הפורטל מיועד ללקוחות פריים לדג'ר בלבד. חל איסור להעביר פרטי גישה לצד שלישי. כל שימוש מסחרי ללא אישור אסור.</p>
             <h4>3. אחריות</h4>
-            <p>פריים לדג'ר אינה אחראית לנזקים עקב שימוש לא מורשה בחשבון. הנתונים הפיננסיים נשמרים על גבי המכשיר המקומי בלבד ואינם מועברים לשרתים חיצוניים.</p>
+            <p>פריים לדג'ר אינה אחראית לנזקים עקב שימוש לא מורשה בחשבון. הנתונים הפיננסיים שלך (חשבונות, רישומים, תנועות בנק) נשמרים על גבי המכשיר המקומי שלך בלבד. פרטי החשבון שלך (שם, דוא"ל, טלפון, שם עסק) ותכונות שירות נוספות (עדכוני משרד, תזכורות, צ'אט, תוכנית הפניות) מאוחסנים בשירות אחסון מאובטח בענן, כדי לאפשר התחברות וגישה מכל מכשיר.</p>
             <h4>4. קניין רוחני</h4>
             <p>כל זכויות הקניין הרוחני של הפורטל שמורות לפריים לדג'ר. אין להעתיק, לשכפל, או להפיץ כל חלק מהפורטל ללא אישור בכתב.</p>
             <h4>5. שינויים בתנאים</h4>
@@ -843,13 +912,13 @@ h2{font-size:16px;font-weight:800;margin-bottom:4px}
             <h4>2. שימוש במידע</h4>
             <p>המידע משמש אך ורק למתן שירותי הנהלת חשבונות, יצירת דוחות פיננסיים, ויצירת קשר בנוגע לחשבונך.</p>
             <h4>3. אחסון מידע</h4>
-            <p>הנתונים הפיננסיים שלך נשמרים בדפדפן שלך בלבד (localStorage). פריים לדג'ר אינה מאחסנת נתונים פיננסיים בשרתים.</p>
+            <p>הנתונים הפיננסיים שלך (חשבונות, רישומים, תנועות בנק) נשמרים בדפדפן שלך (localStorage) ואינם מועברים לשרתים חיצוניים. פרטי ההתחברות שלך (שם, דוא"ל, טלפון, שם עסק) ותכונות שירות נוספות — עדכוני המשרד, תזכורות, הודעות צ'אט ותוכנית הפניות — מאוחסנים בשירות ענן מאובטח (Supabase), כדי לאפשר התחברות וגישה מכל מכשיר.</p>
             <h4>4. שיתוף מידע</h4>
-            <p>איננו מוכרים, משכירים, או מעבירים מידע אישי לצדדים שלישיים, למעט כנדרש על פי חוק.</p>
+            <p>איננו מוכרים, משכירים, או מעבירים מידע אישי לצדדים שלישיים, למעט כנדרש על פי חוק. אנו משתמשים ב-Supabase כשירות תשתית ואחסון בענן (ספק עיבוד מידע) לאחסון פרטי החשבון ותכונות השירות המפורטות בסעיף 3.</p>
             <h4>5. זכויותיך</h4>
             <p>בהתאם לחוק הגנת הפרטיות תשמ"א-1981 ותיקון 13, יש לך זכות לעיין, לתקן או לבקש מחיקת מידע אישי בכל עת.</p>
             <h4>6. קובצי עוגיה (Cookies)</h4>
-            <p>הפורטל אינו משתמש בקובצי עוגיה. הנתונים נשמרים ב-localStorage בדפדפן בלבד.</p>
+            <p>הפורטל אינו משתמש בקובצי עוגיה (Cookies). הנתונים הפיננסיים נשמרים ב-localStorage בדפדפן; פרטי חשבון ותכונות שירות נוספות נשמרים בשירות ענן מאובטח — ראה סעיף 3 לעיל.</p>
           </div>
         </div>
         <div id="legal-accessibility" class="legal-section">
@@ -902,12 +971,61 @@ h2{font-size:16px;font-weight:800;margin-bottom:4px}
         </div>
       </div>
 
+      <!-- REFERRAL TAB -->
+      <div id="ptab-referral" class="portal-tab">
+        <h2>🎁 הפניית חברים</h2>
+        <p class="subtitle">הזמן לקוחות נוספים — כל הפניה שמובילה לרישום מקנה לך הטבה</p>
+        <div class="card" style="border-color:#10b98150;background:#10b98108">
+          <div class="sec-title" style="color:#10b981">הקוד האישי שלך</div>
+          <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:10px">
+            <div id="ref-code-display" style="font-size:22px;font-weight:800;letter-spacing:2px;color:#10b981;background:var(--surface);border:1px dashed #10b98150;border-radius:8px;padding:8px 16px">------</div>
+            <button class="btn btn-sm" onclick="copyReferralCode()">📋 העתק קוד</button>
+            <button class="btn btn-sm btn-blue" onclick="copyReferralLink()">🔗 העתק קישור</button>
+          </div>
+          <div style="font-size:12px;color:var(--muted2)">שלח את הקוד או הקישור לחבר — כשהוא נרשם ומזין את הקוד, ההפניה נרשמת אצלנו ואנו ניצור איתך קשר למתן ההטבה.</div>
+        </div>
+        <div class="card">
+          <div class="sec-title">ההפניות שלי <span id="ref-count" style="color:var(--muted);font-size:12px"></span></div>
+          <div id="ref-list"><div style="color:var(--muted);font-size:12px">עדיין לא הפנית אף אחד</div></div>
+        </div>
+      </div>
+
       <!-- COMING SOON TABS -->
       <div id="ptab-pl" class="portal-tab"><div class="coming-soon"><div class="coming-soon-icon">📊</div><h3>דוח דוחות שנתיים</h3><p>מודול זה יאפשר לך לייצר דוח דוחות שנתיים מפורט.</p><div class="coming-soon-badge">🚀 בקרוב</div></div></div>
       <div id="ptab-balance" class="portal-tab"><div class="coming-soon"><div class="coming-soon-icon">⚖️</div><h3>מאזן</h3><p>סקירת נכסים, התחייבויות והון עצמי של העסק.</p><div class="coming-soon-badge">🚀 בקרוב</div></div></div>
       <div id="ptab-vat" class="portal-tab"><div class="coming-soon"><div class="coming-soon-icon">🧾</div><h3>ניהול מע"מ</h3><p>חישוב מע"מ לתשלום / החזר לפי תקופת דיווח.</p><div class="coming-soon-badge">🚀 בקרוב</div></div></div>
       <div id="ptab-salary" class="portal-tab"><div class="coming-soon"><div class="coming-soon-icon">👷</div><h3>ניהול שכר</h3><p>תלושי שכר, דמי ביטוח לאומי ודיווחי מס שכר.</p><div class="coming-soon-badge">🚀 בקרוב</div></div></div>
 
+    </div>
+  </div>
+</div>
+
+<!-- FLOATING CHAT WIDGET (client only) -->
+<button id="chat-widget-btn" class="no-print" onclick="toggleChatWidget()" style="display:none;position:fixed;bottom:20px;left:20px;width:54px;height:54px;border-radius:50%;background:linear-gradient(135deg,#1e5fa8,#2563eb);border:none;color:#fff;font-size:22px;cursor:pointer;box-shadow:0 6px 18px #00000055;z-index:600">💬</button>
+<div id="chat-widget-panel" class="no-print" style="position:fixed;bottom:84px;left:20px;width:300px;max-width:90vw;height:380px;background:var(--card);border:1px solid var(--border);border-radius:14px;box-shadow:0 10px 30px #00000066;z-index:600;display:none;flex-direction:column;overflow:hidden">
+  <div style="background:linear-gradient(135deg,#1e5fa8,#2563eb);padding:12px 14px;color:#fff;display:flex;justify-content:space-between;align-items:center">
+    <span style="font-weight:700;font-size:13px">💬 צ'אט עם המשרד</span>
+    <button onclick="toggleChatWidget()" style="background:none;border:none;color:#fff;font-size:16px;cursor:pointer">✕</button>
+  </div>
+  <div id="chat-widget-body" style="flex:1;overflow-y:auto;padding:12px"></div>
+  <div style="display:flex;gap:6px;padding:10px;border-top:1px solid var(--border)">
+    <input id="chat-widget-input" placeholder="כתוב הודעה..." style="flex:1" onkeydown="if(event.key==='Enter')sendChatMessage()">
+    <button class="btn-solid" style="padding:8px 12px" onclick="sendChatMessage()">➤</button>
+  </div>
+</div>
+<style>#chat-widget-panel.open{display:flex!important}</style>
+
+<!-- ADMIN CHAT MODAL -->
+<div class="modal-bg" id="adm-chat-modal" onclick="if(event.target===this)adminCloseChat()">
+  <div class="modal" style="max-width:420px;display:flex;flex-direction:column;height:60vh">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px">
+      <span id="adm-chat-title" style="font-weight:800;font-size:14px">💬 צ'אט</span>
+      <button class="btn btn-sm" onclick="adminCloseChat()">✕</button>
+    </div>
+    <div id="adm-chat-body" style="flex:1;overflow-y:auto;background:var(--surface);border-radius:8px;padding:10px;margin-bottom:10px"></div>
+    <div style="display:flex;gap:6px">
+      <input id="adm-chat-input" placeholder="כתוב תשובה..." style="flex:1" onkeydown="if(event.key==='Enter')adminSendChat()">
+      <button class="btn-solid" style="padding:8px 14px" onclick="adminSendChat()">שלח</button>
     </div>
   </div>
 </div>
@@ -958,9 +1076,22 @@ const PLANS = {
 };
 // ══════════════════════════════════════
 
-const ADMIN_EMAIL = 'admin@primels.co.il';
+// ══════════════════════════════════════
+// 🔌 SUPABASE — engagement features (announcements, reminders, chat, referrals)
+// NOTE: This uses the public anon key (client-side), and the portal still uses its
+// own custom email/password login (not Supabase Auth). RLS policies on these tables
+// are therefore permissive by design — they are not scoped to a verified identity.
+// This is fine for low-sensitivity engagement data, but should be revisited (moved to
+// real Supabase Auth) before this portal is opened to the general public.
+// ══════════════════════════════════════
+const SUPABASE_URL = 'https://urpzikwromhwtuffkhyr.supabase.co';
+const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InVycHppa3dyb21od3R1ZmZraHlyIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzk5Njk4MDEsImV4cCI6MjA5NTU0NTgwMX0.lnnmGDSkQ8hPR0QGP2WnJAhDO2qIZSfJWaXh15c7Obo';
+const sb = window.supabase ? window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY) : null;
+
+const ADMIN_EMAIL = 'admin@primesolutionfinance.com';
 const ADMIN_PASS_KEY = 'pl_admin_pass';
 let currentUser = null;
+let usersCache = {}; // in-memory mirror of public.portal_users, refreshed on demand
 const sentWarnings = new Set();
 
 // ── THEME ──
@@ -975,8 +1106,42 @@ function setTheme(t){
 function loadTheme(){ setTheme(localStorage.getItem('pl_theme')||'dark'); }
 
 // ── AUTH ──
-function getUsers(){ try{ return JSON.parse(localStorage.getItem('pl_users')||'{}'); }catch(e){ return {}; } }
-function saveUsers(u){ localStorage.setItem('pl_users', JSON.stringify(u)); }
+// ── USER REGISTRY ──
+// getUsers()/saveUsers() keep their original synchronous shape (so the many existing
+// call-sites don't need to change), but are now backed by Supabase's portal_users
+// table via an in-memory cache, instead of localStorage — this is what makes login
+// work across devices. refreshUsersCache() pulls the latest data; call it before any
+// read that must be fully up to date (e.g. opening the admin panel).
+function mapUserRow(u){
+  return {name:u.name||'', biz:u.biz||'', phone:u.phone||'', pass:u.pass,
+    usage:u.usage_type||'biz', role:u.role||'user', plan:u.plan||'free',
+    blocked:!!u.blocked, upgradeRequested:!!u.upgrade_requested,
+    upgradeRequestedAt:u.upgrade_requested_at, upgradeApprovedAt:u.upgrade_approved_at,
+    createdAt:u.created_at};
+}
+async function refreshUsersCache(){
+  if(!sb) return usersCache;
+  const {data,error} = await sb.from('portal_users').select('*');
+  if(!error && data){
+    const fresh={};
+    data.forEach(u=>{ fresh[u.email]=mapUserRow(u); });
+    usersCache=fresh;
+  }
+  return usersCache;
+}
+function getUsers(){ return usersCache; }
+function saveUsers(usersObj){
+  usersCache = usersObj;
+  if(!sb) return;
+  const rows = Object.entries(usersObj).map(([email,u])=>({
+    email, name:u.name||'', biz:u.biz||'', phone:u.phone||'', pass:u.pass||'',
+    usage_type:u.usage||'biz', role:u.role||'user', plan:u.plan||'free',
+    blocked:!!u.blocked, upgrade_requested:!!u.upgradeRequested,
+    upgrade_requested_at:u.upgradeRequestedAt||null,
+    created_at:u.createdAt||new Date().toISOString()
+  }));
+  if(rows.length) sb.from('portal_users').upsert(rows).then(({error})=>{ if(error) console.error('saveUsers sync error',error); });
+}
 function getAdminPass(){ return localStorage.getItem(ADMIN_PASS_KEY)||'Admin123!'; }
 function openTerms(){ document.getElementById('terms-modal').classList.add('open'); }
 function closeTerms(){ document.getElementById('terms-modal').classList.remove('open'); }
@@ -995,7 +1160,7 @@ function showAuthTab(tab,btn){
   document.getElementById('auth-register').style.display = tab==='register' ? 'block' : 'none';
 }
 
-function doLogin(){
+async function doLogin(){
   const email = document.getElementById('login-email').value.trim().toLowerCase();
   const pass = document.getElementById('login-pass').value;
   const err = document.getElementById('login-error');
@@ -1004,20 +1169,28 @@ function doLogin(){
     currentUser = {email, name:'מנהל', biz:"פריים לדג'ר", role:'admin', plan:'pro', usage:'biz'};
     enterPortal(); return;
   }
-  const users = getUsers();
-  if(!users[email] || users[email].pass!==pass){ err.style.display='block'; return; }
-  if(users[email].blocked){ err.textContent='חשבון זה חסום. פנה למנהל: 055-502-7988'; err.style.display='block'; return; }
-  currentUser = {...users[email], email};
+  let userRow=null;
+  if(sb){
+    const {data} = await sb.from('portal_users').select('*').eq('email',email).maybeSingle();
+    if(data) userRow = mapUserRow(data);
+  } else {
+    userRow = getUsers()[email];
+  }
+  if(!userRow || userRow.pass!==pass){ err.style.display='block'; return; }
+  if(userRow.blocked){ err.textContent='חשבון זה חסום. פנה למנהל: 055-502-7988'; err.style.display='block'; return; }
+  usersCache[email]=userRow; // seed cache so single-user reads (requestUpgrade, changePassword) work this session
+  currentUser = {...userRow, email};
   enterPortal();
 }
 
-function doRegister(){
+async function doRegister(){
   const usageEl = document.querySelector('input[name="reg-usage"]:checked');
   const name = document.getElementById('reg-name').value.trim();
   const biz = document.getElementById('reg-biz').value.trim();
   const email = document.getElementById('reg-email').value.trim().toLowerCase();
   const phone = document.getElementById('reg-phone').value.trim();
   const pass = document.getElementById('reg-pass').value;
+  const refCode = document.getElementById('reg-ref-code').value.trim().toUpperCase();
   const terms = document.getElementById('reg-terms').checked;
   const err = document.getElementById('reg-error'), info = document.getElementById('reg-info');
   err.style.display='none'; info.style.display='none';
@@ -1027,13 +1200,23 @@ function doRegister(){
   if(pass.length<6){ err.textContent='הסיסמה חייבת לפחות 6 תווים'; err.style.display='block'; return; }
   if(!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)){ err.textContent='אימייל לא תקין'; err.style.display='block'; return; }
   if(!/^[0-9+\-\s]{7,15}$/.test(phone)){ err.textContent='טלפון לא תקין'; err.style.display='block'; return; }
-  const users = getUsers();
-  if(users[email]){ err.textContent='משתמש עם אימייל זה כבר קיים'; err.style.display='block'; return; }
-  users[email] = {name,biz,phone,pass,usage:usageEl.value,role:'user',plan:'free',blocked:false,createdAt:new Date().toISOString()};
-  saveUsers(users);
-  info.textContent='✅ ההרשמה הצליחה! ניתן להתחבר כעת.';
+  const newUser = {name,biz,phone,pass,usage:usageEl.value,role:'user',plan:'free',blocked:false,createdAt:new Date().toISOString()};
+  if(sb){
+    const {data:existing} = await sb.from('portal_users').select('email').eq('email',email).maybeSingle();
+    if(existing){ err.textContent='משתמש עם אימייל זה כבר קיים'; err.style.display='block'; return; }
+    const {error} = await sb.from('portal_users').insert({
+      email, name, biz, phone, pass, usage_type:usageEl.value, role:'user', plan:'free', blocked:false
+    });
+    if(error){ err.textContent='שגיאת רישום: '+error.message; err.style.display='block'; return; }
+  } else {
+    const users = getUsers();
+    if(users[email]){ err.textContent='משתמש עם אימייל זה כבר קיים'; err.style.display='block'; return; }
+  }
+  usersCache[email]=newUser;
+  if(refCode) linkReferral(refCode, email);
+  info.textContent='✅ ההרשמה הצליחה! ניתן להתחבר כעת מכל מכשיר.';
   info.style.display='block';
-  ['reg-name','reg-biz','reg-email','reg-phone','reg-pass'].forEach(id=>document.getElementById(id).value='');
+  ['reg-name','reg-biz','reg-email','reg-phone','reg-pass','reg-ref-code'].forEach(id=>document.getElementById(id).value='');
   document.getElementById('reg-terms').checked=false;
   document.querySelectorAll('input[name="reg-usage"]').forEach(r=>r.checked=false);
   ['usage-biz-label','usage-priv-label'].forEach(id=>{const el=document.getElementById(id);if(el)el.style.borderColor='var(--border)';});
@@ -1067,6 +1250,17 @@ function enterPortal(){
   clientName = currentUser.biz||currentUser.name||'';
   refreshAll();
   renderPlansTab();
+  renderHealthScore();
+  loadAnnouncements();
+  loadReminders();
+  if(currentUser.role!=='admin'){
+    document.getElementById('chat-widget-btn').style.display='flex';
+    ensureMyReferralCode();
+  } else {
+    renderAdminAnnouncements();
+    renderAdminReferrals();
+    renderAdminChatList();
+  }
 }
 
 // ── USAGE MODE ──
@@ -1143,8 +1337,9 @@ function switchPortalTab(name,btn){
   document.getElementById('ptab-'+name).classList.add('active');
   if(btn) btn.classList.add('active');
   if(name==='cashflow') refreshAll();
-  if(name==='admin') renderAdminPanel();
+  if(name==='admin'){ refreshUsersCache().then(renderAdminPanel); renderAdminAnnouncements(); renderAdminReferrals(); renderAdminChatList(); }
   if(name==='plans') renderPlansTab();
+  if(name==='referral') renderReferralTab();
 }
 
 // ── LEGAL ──
@@ -1191,6 +1386,288 @@ function requestUpgrade(){
   currentUser.upgradeRequestedAt = new Date().toISOString();
   openUpgradeModal();
   renderPlansTab();
+}
+
+// ══════════════════════════════════════
+// 🩺 FINANCIAL HEALTH SCORE — pure client-side, computed from existing data
+// Factors: reconciliation rate, balance sign, expense/income ratio, credit-limit usage
+// ══════════════════════════════════════
+function computeHealthScore(){
+  const totalBank = bankRows.length;
+  const matchedBank = bankRows.filter(r=>r.matched).length;
+  const reconcileRate = totalBank ? matchedBank/totalBank : 1;
+  const ob = accounts.reduce((s,a)=>s+a.opening,0);
+  const tI = records.filter(r=>r.type==="הכנסה"&&!r.bankRowId).reduce((s,r)=>s+r.amount,0)+bankRows.reduce((s,r)=>s+r.credit,0);
+  const tE = records.filter(r=>r.type==="הוצאה"&&!r.bankRowId).reduce((s,r)=>s+r.amount,0)+bankRows.reduce((s,r)=>s+r.debit,0);
+  const bal = ob+tI-tE;
+  const expRatio = tI>0 ? Math.min(1.5, tE/tI) : (tE>0?1.5:0);
+  // worst limit usage % across accounts with a credit limit
+  let worstLimitPct = 0;
+  accounts.filter(a=>a.limit>0).forEach(a=>{
+    const {bal:abal} = getAccountBalance(a);
+    const used = Math.max(0,-abal);
+    const pct = Math.min(100,(used/a.limit)*100);
+    if(pct>worstLimitPct) worstLimitPct=pct;
+  });
+  let score = 100;
+  score -= (1-reconcileRate)*30;            // up to -30 for unreconciled bank rows
+  score -= bal<0 ? 20 : 0;                  // -20 if overall balance negative
+  score -= Math.max(0,(expRatio-0.8))*40;   // penalize spending close to/over income
+  score -= (worstLimitPct/100)*20;          // up to -20 for near-maxed credit limit
+  score = Math.max(0, Math.min(100, Math.round(score)));
+  const reasons=[];
+  if(reconcileRate<0.9 && totalBank>0) reasons.push(`${Math.round((1-reconcileRate)*100)}% מהתנועות הבנקאיות לא מותאמות`);
+  if(bal<0) reasons.push('היתרה הכוללת שלילית');
+  if(expRatio>0.9) reasons.push('ההוצאות קרובות להכנסות או עוברות אותן');
+  if(worstLimitPct>=70) reasons.push(`חשבון אחד מנצל ${Math.round(worstLimitPct)}% מהמסגרת`);
+  if(!reasons.length) reasons.push('המצב הפיננסי מאוזן ומעודכן 👍');
+  return {score, reasons};
+}
+function renderHealthScore(){
+  const card=document.getElementById('health-card'); if(!card) return;
+  const {score,reasons}=computeHealthScore();
+  const ring=document.getElementById('health-ring');
+  const circumference=226; // 2*PI*36
+  const offset=circumference - (score/100)*circumference;
+  const color = score>=70?'#10b981':score>=40?'#f59e0b':'#ef4444';
+  ring.style.stroke=color; ring.style.strokeDashoffset=offset;
+  document.getElementById('health-score').textContent=score;
+  document.getElementById('health-score').style.color=color;
+  document.getElementById('health-label').textContent = score>=70?'מצב פיננסי טוב 👍':score>=40?'יש מקום לשיפור':'דורש תשומת לב';
+  document.getElementById('health-label').style.color=color;
+  document.getElementById('health-detail').innerHTML = reasons.map(r=>`• ${r}`).join('<br>');
+}
+
+// ══════════════════════════════════════
+// 📣 OFFICE ANNOUNCEMENTS (Supabase — global broadcast)
+// ══════════════════════════════════════
+async function loadAnnouncements(){
+  const box=document.getElementById('admin-messages'); if(!box) return;
+  if(!sb){ box.innerHTML='<div style="color:var(--muted);font-size:12px">אין חיבור לעדכונים כעת</div>'; return; }
+  const {data,error} = await sb.from('portal_announcements').select('*').order('created_at',{ascending:false}).limit(5);
+  if(error || !data || !data.length){ box.innerHTML='<div style="color:var(--muted2);font-size:12px;padding:8px 0">אין הודעות חדשות</div>'; return; }
+  box.innerHTML = data.map(a=>`<div style="padding:8px 0;border-bottom:1px solid var(--border)">
+    <div style="font-weight:700;font-size:13px;margin-bottom:2px">${a.title}</div>
+    <div style="color:var(--muted2);font-size:12px;line-height:1.6">${a.message}</div>
+    <div style="color:var(--muted);font-size:10px;margin-top:3px">${new Date(a.created_at).toLocaleDateString('he-IL')}</div>
+  </div>`).join('');
+}
+async function adminPostAnnouncement(){
+  const title=document.getElementById('adm-ann-title').value.trim();
+  const msg=document.getElementById('adm-ann-msg').value.trim();
+  if(!title||!msg){ alert('נא למלא כותרת ותוכן'); return; }
+  if(!sb){ alert('אין חיבור ל-Supabase'); return; }
+  const {error} = await sb.from('portal_announcements').insert({title,message:msg});
+  if(error){ alert('שגיאה בשליחה: '+error.message); return; }
+  document.getElementById('adm-ann-title').value=''; document.getElementById('adm-ann-msg').value='';
+  alert('✅ העדכון פורסם לכל הלקוחות');
+  renderAdminAnnouncements();
+}
+async function renderAdminAnnouncements(){
+  const list=document.getElementById('adm-ann-list'); if(!list||!sb) return;
+  const {data} = await sb.from('portal_announcements').select('*').order('created_at',{ascending:false}).limit(10);
+  list.innerHTML = (data&&data.length) ? data.map(a=>`<div class="card2" style="display:flex;justify-content:space-between;align-items:start;gap:8px">
+    <div><div style="font-weight:700;font-size:12px">${a.title}</div><div style="color:var(--muted2);font-size:11px;margin-top:2px">${a.message}</div></div>
+    <button class="btn btn-red btn-sm" onclick="adminDeleteAnnouncement('${a.id}')">מחק</button>
+  </div>`).join('') : '<div style="color:var(--muted);font-size:12px">אין עדכונים</div>';
+}
+async function adminDeleteAnnouncement(id){
+  if(!sb) return;
+  await sb.from('portal_announcements').delete().eq('id',id);
+  renderAdminAnnouncements();
+}
+
+// ══════════════════════════════════════
+// ⏰ REMINDERS — computed tax deadlines + admin-set personal reminders (Supabase)
+// ══════════════════════════════════════
+function getComputedReminders(){
+  const today=new Date(); const reminders=[];
+  // VAT filing reminder: 15th of each month (covers prior period) — generic, same for everyone
+  const day=today.getDate();
+  if(day>=10 && day<=15){
+    reminders.push({title:'📅 מועד הגשת מע"מ מתקרב', message:'דיווח המע"מ לתקופה הקודמת מוגש עד ה-15 בחודש.', computed:true});
+  }
+  if(bankRows.filter(r=>!r.matched).length>5){
+    reminders.push({title:'🔗 תנועות בנק מצטברות', message:'יש לך מעל 5 תנועות בנק שלא הותאמו — מומלץ לטפל בלשונית "התאמה".', computed:true});
+  }
+  const lastImport = bankRows.length ? Math.max(...bankRows.map(r=>new Date(r.date||0).getTime()||0)) : 0;
+  const daysSinceImport = lastImport ? (Date.now()-lastImport)/86400000 : 999;
+  if(daysSinceImport>35){
+    reminders.push({title:'📥 לא יובא דף בנק זה זמן רב', message:'נראה שלא ייבאת דף בנק בחודש האחרון — ייבוא שוטף עוזר לדייק את התזרים.', computed:true});
+  }
+  return reminders;
+}
+async function loadReminders(){
+  const card=document.getElementById('reminders-card'), list=document.getElementById('reminders-list');
+  if(!card||!list) return;
+  let items = getComputedReminders();
+  if(sb && currentUser){
+    const {data} = await sb.from('portal_reminders').select('*').eq('client_email',currentUser.email).eq('dismissed',false).order('created_at',{ascending:false});
+    if(data) items = [...items, ...data.map(r=>({id:r.id,title:'📌 '+r.title,message:r.message,dueDate:r.due_date,fromAdmin:true}))];
+  }
+  if(!items.length){ card.style.display='none'; return; }
+  card.style.display='block';
+  list.innerHTML = items.map(r=>`<div class="card2" style="border-right:3px solid #f59e0b">
+    <div style="display:flex;justify-content:space-between;align-items:start;gap:8px">
+      <div><div style="font-weight:700;font-size:13px">${r.title}</div>
+        <div style="color:var(--muted2);font-size:12px;margin-top:2px">${r.message}${r.dueDate?' · עד '+new Date(r.dueDate).toLocaleDateString('he-IL'):''}</div></div>
+      ${r.fromAdmin?`<button class="btn btn-sm" onclick="dismissReminder('${r.id}')">✓</button>`:''}
+    </div>
+  </div>`).join('');
+}
+async function dismissReminder(id){
+  if(!sb) return;
+  await sb.from('portal_reminders').update({dismissed:true}).eq('id',id);
+  loadReminders();
+}
+async function adminSetReminder(){
+  const email=document.getElementById('adm-rem-email').value.trim().toLowerCase();
+  const title=document.getElementById('adm-rem-title').value.trim();
+  const msg=document.getElementById('adm-rem-msg').value.trim();
+  const due=document.getElementById('adm-rem-due').value||null;
+  if(!email||!title){ alert('נא למלא אימייל לקוח וכותרת'); return; }
+  if(!sb){ alert('אין חיבור ל-Supabase'); return; }
+  const {error}=await sb.from('portal_reminders').insert({client_email:email,title,message:msg,due_date:due});
+  if(error){ alert('שגיאה: '+error.message); return; }
+  ['adm-rem-email','adm-rem-title','adm-rem-msg','adm-rem-due'].forEach(id=>document.getElementById(id).value='');
+  alert('✅ התזכורת נשלחה ללקוח');
+}
+
+// ══════════════════════════════════════
+// 🎁 REFERRAL PROGRAM (Supabase)
+// ══════════════════════════════════════
+function genReferralCode(email){
+  let hash=0;
+  for(let i=0;i<email.length;i++){ hash=(hash*31+email.charCodeAt(i))>>>0; }
+  return 'PL'+hash.toString(36).toUpperCase().slice(0,6);
+}
+async function ensureMyReferralCode(){
+  if(!sb||!currentUser||currentUser.role==='admin') return null;
+  const code=genReferralCode(currentUser.email);
+  const {data}=await sb.from('portal_referrals').select('id').eq('referral_code',code).eq('referrer_email',currentUser.email).is('referred_email',null).limit(1);
+  if(!data||!data.length){
+    await sb.from('portal_referrals').insert({referrer_email:currentUser.email,referral_code:code,referred_email:null});
+  }
+  return code;
+}
+async function linkReferral(code, newEmail){
+  if(!sb||!code) return;
+  const {data} = await sb.from('portal_referrals').select('referrer_email').eq('referral_code',code).limit(1).maybeSingle();
+  if(data && data.referrer_email && data.referrer_email!==newEmail){
+    await sb.from('portal_referrals').insert({referrer_email:data.referrer_email,referral_code:code,referred_email:newEmail,referred_at:new Date().toISOString()});
+  }
+}
+async function renderReferralTab(){
+  if(!currentUser||currentUser.role==='admin') return;
+  const code = await ensureMyReferralCode();
+  if(!code) return;
+  document.getElementById('ref-code-display').textContent=code;
+  if(!sb) return;
+  const {data} = await sb.from('portal_referrals').select('*').eq('referrer_email',currentUser.email).not('referred_email','is',null).order('referred_at',{ascending:false});
+  const list=document.getElementById('ref-list');
+  document.getElementById('ref-count').textContent = data&&data.length ? data.length+' הפניות' : '';
+  if(!data||!data.length){ list.innerHTML='<div style="color:var(--muted);font-size:12px">עדיין לא הפנית אף אחד</div>'; return; }
+  list.innerHTML = data.map(r=>`<div class="card2" style="display:flex;justify-content:space-between;align-items:center">
+    <div><div style="font-weight:600;font-size:13px">${r.referred_email}</div><div style="color:var(--muted);font-size:11px">${new Date(r.referred_at).toLocaleDateString('he-IL')}</div></div>
+    <span class="sbadge" style="background:${r.reward_granted?'#10b98120':'#f59e0b20'};color:${r.reward_granted?'#10b981':'#f59e0b'}">${r.reward_granted?'✅ הוטבה ניתנה':'⏳ ממתין למשרד'}</span>
+  </div>`).join('');
+}
+function copyReferralCode(){
+  const code=document.getElementById('ref-code-display').textContent;
+  navigator.clipboard.writeText(code).then(()=>alert('✅ הקוד הועתק: '+code));
+}
+function copyReferralLink(){
+  const code=document.getElementById('ref-code-display').textContent;
+  const link=location.origin+location.pathname+'?ref='+code;
+  navigator.clipboard.writeText(link).then(()=>alert('✅ הקישור הועתק'));
+}
+async function renderAdminReferrals(){
+  const card=document.getElementById('adm-referral-card'), list=document.getElementById('adm-referral-list');
+  if(!card||!list||!sb) return;
+  const {data} = await sb.from('portal_referrals').select('*').not('referred_email','is',null).eq('reward_granted',false).order('referred_at',{ascending:false});
+  if(data && data.length){
+    card.style.display='block';
+    list.innerHTML = data.map(r=>`<div class="card2" style="display:flex;justify-content:space-between;align-items:center;gap:8px">
+      <div><div style="font-weight:700;font-size:12px">${r.referrer_email}</div><div style="color:var(--muted2);font-size:11px">הפנה/תה את ${r.referred_email}</div></div>
+      <button class="btn btn-sm" style="border-color:#10b981;color:#10b981" onclick="adminGrantReferralReward('${r.id}')">✅ ניתנה הטבה</button>
+    </div>`).join('');
+  } else { card.style.display='none'; }
+}
+async function adminGrantReferralReward(id){
+  if(!sb) return;
+  await sb.from('portal_referrals').update({reward_granted:true}).eq('id',id);
+  renderAdminReferrals();
+}
+
+// ══════════════════════════════════════
+// 💬 LIVE CHAT WITH OFFICE (Supabase, floating widget)
+// ══════════════════════════════════════
+let chatPollInterval=null;
+function toggleChatWidget(){
+  const panel=document.getElementById('chat-widget-panel');
+  const open=panel.classList.toggle('open');
+  if(open){ loadChatMessages(); if(!chatPollInterval) chatPollInterval=setInterval(loadChatMessages,8000); }
+}
+async function loadChatMessages(){
+  if(!sb||!currentUser||currentUser.role==='admin') return;
+  const {data} = await sb.from('portal_chat_messages').select('*').eq('client_email',currentUser.email).order('created_at',{ascending:true});
+  const body=document.getElementById('chat-widget-body'); if(!body) return;
+  if(!data||!data.length){ body.innerHTML='<div style="color:var(--muted);font-size:12px;text-align:center;padding:20px">שלח הודעה למשרד — נחזור אליך בהקדם</div>'; return; }
+  body.innerHTML = data.map(m=>`<div style="display:flex;justify-content:${m.sender==='client'?'flex-start':'flex-end'};margin-bottom:8px">
+    <div style="max-width:80%;padding:8px 12px;border-radius:10px;font-size:13px;background:${m.sender==='client'?'var(--surface)':'#1e5fa825'};color:var(--text)">
+      ${m.message}<div style="font-size:9px;color:var(--muted);margin-top:3px">${new Date(m.created_at).toLocaleTimeString('he-IL',{hour:'2-digit',minute:'2-digit'})}</div>
+    </div>
+  </div>`).join('');
+  body.scrollTop=body.scrollHeight;
+  await sb.from('portal_chat_messages').update({read:true}).eq('client_email',currentUser.email).eq('sender','admin');
+}
+async function sendChatMessage(){
+  const input=document.getElementById('chat-widget-input');
+  const msg=input.value.trim();
+  if(!msg||!sb||!currentUser) return;
+  await sb.from('portal_chat_messages').insert({client_email:currentUser.email,sender:'client',message:msg});
+  input.value='';
+  loadChatMessages();
+}
+// ── Admin side: per-client chat ──
+let adminChatEmail=null;
+async function adminOpenChat(email){
+  adminChatEmail=email;
+  document.getElementById('adm-chat-modal').classList.add('open');
+  document.getElementById('adm-chat-title').textContent='💬 צ\'אט עם '+email;
+  await adminLoadChat();
+}
+function adminCloseChat(){ document.getElementById('adm-chat-modal').classList.remove('open'); adminChatEmail=null; }
+async function adminLoadChat(){
+  if(!sb||!adminChatEmail) return;
+  const {data} = await sb.from('portal_chat_messages').select('*').eq('client_email',adminChatEmail).order('created_at',{ascending:true});
+  const body=document.getElementById('adm-chat-body');
+  body.innerHTML = (data&&data.length) ? data.map(m=>`<div style="display:flex;justify-content:${m.sender==='admin'?'flex-end':'flex-start'};margin-bottom:8px">
+    <div style="max-width:80%;padding:8px 12px;border-radius:10px;font-size:13px;background:${m.sender==='admin'?'#1e5fa825':'var(--surface)'}">${m.message}</div>
+  </div>`).join('') : '<div style="color:var(--muted);font-size:12px;text-align:center;padding:16px">אין הודעות עדיין</div>';
+  body.scrollTop=body.scrollHeight;
+  await sb.from('portal_chat_messages').update({read:true}).eq('client_email',adminChatEmail).eq('sender','client');
+}
+async function adminSendChat(){
+  const input=document.getElementById('adm-chat-input');
+  const msg=input.value.trim();
+  if(!msg||!sb||!adminChatEmail) return;
+  await sb.from('portal_chat_messages').insert({client_email:adminChatEmail,sender:'admin',message:msg});
+  input.value=''; adminLoadChat();
+}
+async function renderAdminChatList(){
+  const list=document.getElementById('adm-chat-list'); if(!list||!sb) return;
+  const {data} = await sb.from('portal_chat_messages').select('client_email,sender,read,created_at').order('created_at',{ascending:false});
+  if(!data||!data.length){ list.innerHTML='<div style="color:var(--muted);font-size:12px">אין שיחות עדיין</div>'; return; }
+  const byClient={};
+  data.forEach(m=>{ if(!byClient[m.client_email]) byClient[m.client_email]={last:m,unread:0}; if(m.sender==='client'&&!m.read) byClient[m.client_email].unread++; });
+  list.innerHTML = Object.entries(byClient).map(([email,info])=>`<div class="user-card" style="cursor:pointer" onclick="adminOpenChat('${email}')">
+    <div class="user-card-top"><div class="user-avatar">${email.charAt(0).toUpperCase()}</div>
+      <div class="user-info"><div class="user-name">${email}</div>
+        <div class="user-meta">${new Date(info.last.created_at).toLocaleString('he-IL')}</div></div>
+      ${info.unread?`<span class="sbadge" style="background:#ef444420;color:#ef4444">${info.unread} חדשות</span>`:''}
+    </div>
+  </div>`).join('');
 }
 
 // ── PLANS TAB ──
@@ -1400,6 +1877,7 @@ function saveEditUser(){
   if(newEmail!==origEmail){ users[newEmail]=updated; delete users[origEmail]; }
   else { users[origEmail]=updated; }
   saveUsers(users);
+  if(sb && newEmail!==origEmail) sb.from('portal_users').delete().eq('email',origEmail).then(({error})=>{ if(error) console.error('email-change cleanup error',error); });
   msg.style.display='block'; msg.style.background='#10b98120'; msg.style.color='#10b981'; msg.textContent='✅ נשמר בהצלחה!';
   setTimeout(()=>{ closeEditUser(); renderAdminPanel(); }, 1000);
 }
@@ -1410,7 +1888,9 @@ function adminToggleBlock(email){
 }
 function adminDeleteUser(email){
   if(!confirm('למחוק את '+email+'?\nפעולה זו בלתי הפיכה!')) return;
-  const u=getUsers(); delete u[email]; saveUsers(u); renderAdminPanel();
+  const u=getUsers(); delete u[email]; saveUsers(u);
+  if(sb) sb.from('portal_users').delete().eq('email',email).then(({error})=>{ if(error) console.error('delete user sync error',error); });
+  renderAdminPanel();
 }
 function adminAddUser(){
   const name=document.getElementById('adm-new-name').value.trim();
@@ -2082,6 +2562,7 @@ function refreshAll(){
   if(!currentUser) return;
   updateLabels(); syncSelects(); renderAccounts(); renderRecords(); renderUploadHistory();
   renderReconcile(); renderCF(); refreshDashboard(); showDupBanner(); updateHomeStats();
+  if(typeof renderHealthScore==='function') renderHealthScore();
 }
 
 // ── INIT ──
@@ -2089,6 +2570,14 @@ document.addEventListener('DOMContentLoaded',()=>{
   loadTheme();
   if(el("r-date")) el("r-date").value=new Date().toISOString().slice(0,10);
   refreshCatSelect();
+  // Pre-fill referral code from ?ref=CODE link and open the register tab
+  const urlRef = new URLSearchParams(location.search).get('ref');
+  if(urlRef){
+    const codeInput = document.getElementById('reg-ref-code');
+    if(codeInput) codeInput.value = urlRef.toUpperCase();
+    const regTabBtn = document.querySelector('.auth-tab:nth-child(2)');
+    if(regTabBtn) showAuthTab('register', regTabBtn);
+  }
 });
 </script>
 </body>
