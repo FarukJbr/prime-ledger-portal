@@ -1142,7 +1142,21 @@ function saveUsers(usersObj){
   }));
   if(rows.length) sb.from('portal_users').upsert(rows).then(({error})=>{ if(error) console.error('saveUsers sync error',error); });
 }
-function getAdminPass(){ return localStorage.getItem(ADMIN_PASS_KEY)||'Admin123!'; }
+let adminPassCache = null;
+async function fetchAdminPass(){
+  if(!sb){ adminPassCache = localStorage.getItem(ADMIN_PASS_KEY)||'Admin123!'; return adminPassCache; }
+  try{
+    const {data} = await sb.from('portal_settings').select('value').eq('key','admin_pass').maybeSingle();
+    adminPassCache = data?.value || 'Admin123!';
+  }catch(e){ adminPassCache = localStorage.getItem(ADMIN_PASS_KEY)||'Admin123!'; }
+  return adminPassCache;
+}
+function getAdminPass(){ return adminPassCache || localStorage.getItem(ADMIN_PASS_KEY) || 'Admin123!'; }
+function setAdminPass(newP){
+  adminPassCache = newP;
+  if(sb) sb.from('portal_settings').upsert({key:'admin_pass', value:newP}).then(({error})=>{ if(error) console.error('setAdminPass sync error', error); });
+  else localStorage.setItem(ADMIN_PASS_KEY, newP);
+}
 function openTerms(){ document.getElementById('terms-modal').classList.add('open'); }
 function closeTerms(){ document.getElementById('terms-modal').classList.remove('open'); }
 
@@ -1248,9 +1262,9 @@ async function enterPortal(){
   }
   const imgEl = document.getElementById('portal-logo-img');
   if(imgEl) imgEl.src = document.getElementById('print-logo').src;
-  loadUserLogo();
   applyUsageMode();
   await loadUserData();
+  loadUserLogo();
   clientName = currentUser.biz||currentUser.name||'';
   refreshAll();
   renderPlansTab();
@@ -1302,16 +1316,17 @@ function applyUsageMode(){
 
 // ── LOGO ──
 function loadUserLogo(){
-  const lg = localStorage.getItem('pl_logo_'+(currentUser?currentUser.email:''));
   const img = document.getElementById('portal-logo-img');
-  if(img) img.src = lg || document.getElementById('print-logo').src;
+  if(img) img.src = userLogoCache || document.getElementById('print-logo').src;
 }
 function uploadLogo(input){
   const file=input.files[0]; if(!file) return;
   const r=new FileReader();
   r.onload=e=>{
     const data=e.target.result;
-    localStorage.setItem('pl_logo_'+(currentUser?currentUser.email:''), data);
+    userLogoCache = data;
+    if(sb && currentUser) sb.from('portal_users').update({logo_data:data}).eq('email',currentUser.email).then(({error})=>{ if(error) console.error('logo sync error',error); });
+    else localStorage.setItem('pl_logo_'+(currentUser?currentUser.email:''), data);
     const prev=document.getElementById('preview-logo'); if(prev){prev.src=data;prev.style.display='block';}
     const btn=document.getElementById('btn-remove-logo'); if(btn) btn.style.display='inline-block';
     const img=document.getElementById('portal-logo-img'); if(img) img.src=data;
@@ -1319,7 +1334,9 @@ function uploadLogo(input){
   r.readAsDataURL(file);
 }
 function removeLogo(){
-  localStorage.removeItem('pl_logo_'+(currentUser?currentUser.email:''));
+  userLogoCache = null;
+  if(sb && currentUser) sb.from('portal_users').update({logo_data:null}).eq('email',currentUser.email).then(({error})=>{ if(error) console.error('logo remove sync error',error); });
+  else localStorage.removeItem('pl_logo_'+(currentUser?currentUser.email:''));
   const prev=document.getElementById('preview-logo'); if(prev){prev.src='';prev.style.display='none';}
   const btn=document.getElementById('btn-remove-logo'); if(btn) btn.style.display='none';
   const img=document.getElementById('portal-logo-img'); if(img) img.src=document.getElementById('print-logo').src;
@@ -1328,7 +1345,7 @@ function removeLogo(){
 // ── SETTINGS ──
 function openSettings(){
   const en=document.getElementById('set-client-name'); if(en) en.value=clientName;
-  const lg=localStorage.getItem('pl_logo_'+(currentUser?currentUser.email:''));
+  const lg=userLogoCache;
   const prev=document.getElementById('preview-logo');
   if(prev&&lg){prev.src=lg;prev.style.display='block';const b=document.getElementById('btn-remove-logo');if(b)b.style.display='inline-block';}
   const t=localStorage.getItem('pl_theme')||'dark';
@@ -1348,7 +1365,7 @@ function changePassword(){
   if(newP.length<6){msg.textContent='סיסמה חייבת לפחות 6 תווים';return;}
   if(currentUser.role==='admin'){
     if(oldP!==getAdminPass()){msg.textContent='הסיסמה הנוכחית שגויה';return;}
-    localStorage.setItem(ADMIN_PASS_KEY,newP);
+    setAdminPass(newP);
   } else {
     const users=getUsers();
     if(!users[currentUser.email]||users[currentUser.email].pass!==oldP){msg.textContent='הסיסמה הנוכחית שגויה';return;}
@@ -1949,7 +1966,7 @@ function adminChangePass(){
   if(newP!==confP){msg.textContent='הסיסמאות אינן תואמות';return;}
   if(newP.length<6){msg.textContent='סיסמה חייבת לפחות 6 תווים';return;}
   if(oldP!==getAdminPass()){msg.textContent='הסיסמה הנוכחית שגויה';return;}
-  localStorage.setItem(ADMIN_PASS_KEY,newP);
+  setAdminPass(newP);
   msg.style.background='#10b98120'; msg.style.color='#10b981'; msg.textContent='✅ הסיסמה שונתה!';
   setTimeout(()=>{['adm-pass-old','adm-pass-new','adm-pass-conf'].forEach(id=>document.getElementById(id).value='');msg.style.display='none';},2500);
 }
@@ -2028,6 +2045,7 @@ async function loadUserData(){
       if(d){ accounts=d.accounts||[]; bankRows=d.bankRows||[]; records=d.records||[]; clientName=d.clientName||''; uploadHistory=d.uploadHistory||[]; }
       else{ accounts=[]; bankRows=[]; records=[]; clientName=''; uploadHistory=[]; }
     }catch(e){ accounts=[]; bankRows=[]; records=[]; clientName=''; uploadHistory=[]; }
+    userLogoCache = localStorage.getItem('pl_logo_'+(currentUser?currentUser.email:'')) || null;
     return;
   }
   const email = currentUser.email;
@@ -2036,20 +2054,21 @@ async function loadUserData(){
       sb.from('portal_accounts').select('*').eq('client_email',email),
       sb.from('portal_bank_rows').select('*').eq('client_email',email),
       sb.from('portal_records').select('*').eq('client_email',email),
-      sb.from('portal_users').select('display_name,upload_history').eq('email',email).maybeSingle()
+      sb.from('portal_users').select('display_name,upload_history,logo_data').eq('email',email).maybeSingle()
     ]);
     accounts = (accD||[]).map(a=>({id:a.id,name:a.name,type:a.type,opening:Number(a.opening)||0,limit:Number(a.credit_limit)||0,color:a.color}));
     bankRows = (bankD||[]).map(r=>({id:r.id,acctId:r.acct_id,date:r.row_date,description:r.description,debit:Number(r.debit)||0,credit:Number(r.credit)||0,matched:!!r.matched,manualEntryId:r.manual_entry_id,bp:r.bp}));
     records = (recD||[]).map(r=>({id:r.id,date:r.record_date,description:r.description,amount:Number(r.amount)||0,type:r.type,bp:r.bp,category:r.category,acctId:r.acct_id,matched:!!r.matched,bankRowId:r.bank_row_id}));
     clientName = userD?.display_name || '';
     uploadHistory = userD?.upload_history || [];
+    userLogoCache = userD?.logo_data || null;
   }catch(e){
     console.error('loadUserData fetch error', e);
     accounts=[]; bankRows=[]; records=[]; clientName=''; uploadHistory=[];
   }
 }
 
-let clientName='', accounts=[], bankRows=[], records=[], uploadHistory=[];
+let clientName='', accounts=[], bankRows=[], records=[], uploadHistory=[], userLogoCache=null;
 let dashAcct='all', dashView='all', dashPeriod='week', recAcct='all', cfPeriod='week';
 let recordType='הוצאה', recordBP='biz', selRec=null, selBank=null;
 const MONTHS=["ינו'","פבר'","מרס'","אפר'","מאי","יונ'","יול'","אוג'","ספט'","אוק'","נוב'","דצמ'"];
@@ -2585,7 +2604,7 @@ function updateLabels(){
   if(el("dash-client-lbl")) el("dash-client-lbl").textContent="מצב פיננסי עדכני"+(clientName?" | "+clientName:"");
   if(el("ph-client")) el("ph-client").textContent=clientName?"לקוח: "+clientName:"";
   if(el("ph-date")) el("ph-date").textContent="תאריך הפקה: "+new Date().toLocaleDateString("he-IL");
-  const lg=localStorage.getItem('pl_logo_'+(currentUser?currentUser.email:''));
+  const lg=userLogoCache;
   const pl=el('print-logo'); if(pl&&lg) pl.src=lg;
 }
 function printSection(s){
@@ -2645,6 +2664,7 @@ function refreshAll(){
 // ── INIT ──
 document.addEventListener('DOMContentLoaded',()=>{
   loadTheme();
+  fetchAdminPass();
   if(el("r-date")) el("r-date").value=new Date().toISOString().slice(0,10);
   refreshCatSelect();
   // Pre-fill referral code from ?ref=CODE link and open the register tab
