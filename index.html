@@ -496,6 +496,15 @@ h2{font-size:16px;font-weight:800;margin-bottom:4px}
             </div>
           </div>
         </div>
+        <!-- AI ASSISTANT -->
+        <div class="card" id="ai-assistant-card" style="border-color:#8b5cf650">
+          <div class="sec-title" style="color:#8b5cf6">🤖 שאל את העוזר הפיננסי</div>
+          <div style="display:flex;gap:8px;margin-bottom:10px">
+            <input id="ai-question-input" placeholder="למשל: כמה הוצאתי על דלק החודש?" onkeydown="if(event.key==='Enter')askFinancialAI()">
+            <button class="btn-solid" style="white-space:nowrap;background:#8b5cf6" onclick="askFinancialAI()">שאל</button>
+          </div>
+          <div id="ai-answer-box" style="display:none;background:var(--surface);border-radius:8px;padding:12px;font-size:13px;line-height:1.8;white-space:pre-wrap"></div>
+        </div>
         <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:12px">
           <div class="card" style="cursor:pointer;border-color:#1e5fa840;transition:.2s" onclick="switchPortalTab('cashflow',document.querySelectorAll('.side-btn')[1])" onmouseenter="this.style.borderColor='var(--brand)'" onmouseleave="this.style.borderColor='#1e5fa840'">
             <div style="font-size:28px;margin-bottom:8px">💹</div>
@@ -1259,6 +1268,7 @@ async function enterPortal(){
     document.getElementById('admin-sb-btn').style.display='flex';
     document.getElementById('plans-sb-btn').style.display='none';
     document.getElementById('referral-sb-btn').style.display='none';
+    document.getElementById('ai-assistant-card').style.display='none';
   }
   const imgEl = document.getElementById('portal-logo-img');
   if(imgEl) imgEl.src = document.getElementById('print-logo').src;
@@ -1468,6 +1478,26 @@ function computeHealthScore(){
   if(worstLimitPct>=70) reasons.push(`חשבון אחד מנצל ${Math.round(worstLimitPct)}% מהמסגרת`);
   if(!reasons.length) reasons.push('המצב הפיננסי מאוזן ומעודכן 👍');
   return {score, reasons};
+}
+// ── AI ASSISTANT ──
+// Calls the ask_financial_ai Postgres RPC, which reads this client's own data
+// server-side and queries Anthropic with a server-held key — the key is never
+// present in this client-side code.
+async function askFinancialAI(){
+  if(!sb || !currentUser || currentUser.role==='admin') return;
+  const input = document.getElementById('ai-question-input');
+  const question = input.value.trim();
+  if(!question) return;
+  const box = document.getElementById('ai-answer-box');
+  box.style.display='block';
+  box.textContent = '🤔 חושב...';
+  try{
+    const {data, error} = await sb.rpc('ask_financial_ai', {p_email: currentUser.email, p_question: question});
+    box.textContent = error ? ('שגיאה: '+error.message) : (data || 'לא התקבלה תשובה');
+  }catch(e){
+    box.textContent = 'שגיאה בתקשורת עם השרת';
+  }
+  input.value='';
 }
 function renderHealthScore(){
   const card=document.getElementById('health-card'); if(!card) return;
