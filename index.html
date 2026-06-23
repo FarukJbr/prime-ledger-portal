@@ -499,11 +499,13 @@ h2{font-size:16px;font-weight:800;margin-bottom:4px}
         <!-- AI ASSISTANT -->
         <div class="card" id="ai-assistant-card" style="border-color:#8b5cf650">
           <div class="sec-title" style="color:#8b5cf6">🤖 שאל את העוזר הפיננסי</div>
-          <div style="display:flex;gap:8px;margin-bottom:10px">
-            <input id="ai-question-input" placeholder="למשל: כמה הוצאתי על דלק החודש?" onkeydown="if(event.key==='Enter')askFinancialAI()">
-            <button class="btn-solid" style="white-space:nowrap;background:#8b5cf6" onclick="askFinancialAI()">שאל</button>
+          <div id="ai-chat-body" style="max-height:280px;overflow-y:auto;margin-bottom:10px;padding:2px">
+            <div style="color:var(--muted);font-size:12px;text-align:center;padding:14px">שאל שאלה על הנתונים הפיננסיים שלך</div>
           </div>
-          <div id="ai-answer-box" style="display:none;background:var(--surface);border-radius:8px;padding:12px;font-size:13px;line-height:1.8;white-space:pre-wrap"></div>
+          <div style="display:flex;gap:8px">
+            <input id="ai-question-input" placeholder="למשל: כמה הוצאתי על דלק החודש?" onkeydown="if(event.key==='Enter')askFinancialAI()">
+            <button class="btn-solid" id="ai-ask-btn" style="white-space:nowrap;background:#8b5cf6" onclick="askFinancialAI()">שאל</button>
+          </div>
         </div>
         <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:12px">
           <div class="card" style="cursor:pointer;border-color:#1e5fa840;transition:.2s" onclick="switchPortalTab('cashflow',document.querySelectorAll('.side-btn')[1])" onmouseenter="this.style.borderColor='var(--brand)'" onmouseleave="this.style.borderColor='#1e5fa840'">
@@ -1482,22 +1484,40 @@ function computeHealthScore(){
 // ── AI ASSISTANT ──
 // Calls the ask_financial_ai Postgres RPC, which reads this client's own data
 // server-side and queries Anthropic with a server-held key — the key is never
-// present in this client-side code.
+// present in this client-side code. Chat history accumulates client-side for
+// the session so previous Q&A stay visible (like a normal chat window).
+let aiChatHistory = [];
+function renderAiChat(){
+  const body = document.getElementById('ai-chat-body');
+  if(!aiChatHistory.length){
+    body.innerHTML = '<div style="color:var(--muted);font-size:12px;text-align:center;padding:14px">שאל שאלה על הנתונים הפיננסיים שלך</div>';
+    return;
+  }
+  body.innerHTML = aiChatHistory.map(m=>`<div style="display:flex;justify-content:${m.role==='user'?'flex-end':'flex-start'};margin-bottom:8px">
+    <div style="max-width:85%;padding:8px 12px;border-radius:10px;font-size:13px;line-height:1.6;white-space:pre-wrap;background:${m.role==='user'?'#8b5cf625':'var(--surface)'}">${m.text}</div>
+  </div>`).join('');
+  body.scrollTop = body.scrollHeight;
+}
 async function askFinancialAI(){
   if(!sb || !currentUser || currentUser.role==='admin') return;
   const input = document.getElementById('ai-question-input');
   const question = input.value.trim();
   if(!question) return;
-  const box = document.getElementById('ai-answer-box');
-  box.style.display='block';
-  box.textContent = '🤔 חושב...';
+  input.value='';
+  const btn = document.getElementById('ai-ask-btn');
+  btn.disabled = true;
+  aiChatHistory.push({role:'user', text:question});
+  const thinking = {role:'assistant', text:'🤔 חושב...'};
+  aiChatHistory.push(thinking);
+  renderAiChat();
   try{
     const {data, error} = await sb.rpc('ask_financial_ai', {p_email: currentUser.email, p_question: question});
-    box.textContent = error ? ('שגיאה: '+error.message) : (data || 'לא התקבלה תשובה');
+    thinking.text = error ? ('שגיאה: '+error.message) : (data || 'לא התקבלה תשובה');
   }catch(e){
-    box.textContent = 'שגיאה בתקשורת עם השרת';
+    thinking.text = 'שגיאה בתקשורת עם השרת';
   }
-  input.value='';
+  renderAiChat();
+  btn.disabled = false;
 }
 function renderHealthScore(){
   const card=document.getElementById('health-card'); if(!card) return;
