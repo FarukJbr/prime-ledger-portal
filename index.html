@@ -739,7 +739,9 @@ h2{font-size:16px;font-weight:800;margin-bottom:4px}
               </div>
               <select id="cf-acct" onchange="renderCF()" style="width:auto;font-size:12px;padding:4px 7px"><option value="all">כל החשבונות</option></select>
               <select id="cf-bp" onchange="renderCF()" style="width:auto;font-size:12px;padding:4px 7px"><option value="all">עסקי+פרטי</option><option value="biz">עסקי</option><option value="priv">פרטי</option></select>
+              <button class="btn btn-sm" id="cf-forecast-toggle" style="border-color:#8b5cf6;color:#8b5cf6" onclick="toggleForecast()">🔮 הצג תחזית עתידית</button>
             </div>
+            <div id="cf-forecast-note" style="display:none;color:var(--muted);font-size:11px;margin-bottom:8px">🔮 התקופות המסומנות הן תחזית המבוססת על ההכנסות/הוצאות הקבועות שהגדרת — לא נתונים בפועל.</div>
             <div class="print-bar">
               <button class="btn btn-blue" onclick="exportCFExcel()">📊 Excel</button>
               <button class="btn btn-red" onclick="printSection('cashflow')">🖨️ הדפסה</button>
@@ -1150,10 +1152,8 @@ const SUPABASE_URL = 'https://urpzikwromhwtuffkhyr.supabase.co';
 const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InVycHppa3dyb21od3R1ZmZraHlyIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzk5Njk4MDEsImV4cCI6MjA5NTU0NTgwMX0.lnnmGDSkQ8hPR0QGP2WnJAhDO2qIZSfJWaXh15c7Obo';
 const sb = window.supabase ? window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY) : null;
 
-const ADMIN_EMAIL = 'admin@primels.co.il';
-const ADMIN_PASS_KEY = 'pl_admin_pass';
 let currentUser = null;
-let usersCache = {}; // in-memory mirror of public.portal_users, refreshed on demand
+let usersCache = {}; // admin-panel cache, mirrors public.profiles via admin_list_users() RPC
 const sentWarnings = new Set();
 
 // ── THEME ──
@@ -1168,56 +1168,45 @@ function setTheme(t){
 function loadTheme(){ setTheme(localStorage.getItem('pl_theme')||'dark'); }
 
 // ── AUTH ──
-// ── USER REGISTRY ──
-// getUsers()/saveUsers() keep their original synchronous shape (so the many existing
-// call-sites don't need to change), but are now backed by Supabase's portal_users
-// table via an in-memory cache, instead of localStorage — this is what makes login
-// work across devices. refreshUsersCache() pulls the latest data; call it before any
-// read that must be fully up to date (e.g. opening the admin panel).
-function mapUserRow(u){
-  return {name:u.name||'', biz:u.biz||'', phone:u.phone||'', pass:u.pass,
-    usage:u.usage_type||'biz', role:u.role||'user', plan:u.plan||'free',
+// Real Supabase Auth now backs login/registration/passwords (hashed server-side,
+// never visible in plaintext — including to us). currentUser.role (from the
+// profiles table) determines admin access; there's no more special-cased admin
+// email/password mechanism. getUsers()/saveUsers() are kept (same shape as before)
+// purely as the ADMIN PANEL's cache — populated via the admin_list_users() RPC and
+// written back per-row via profiles updates, so the admin-panel rendering code
+// below doesn't need to change at all.
+function mapAdminRow(u){
+  return {id:u.id, name:u.full_name||'', biz:u.company_name||'', phone:u.phone||'',
+    usage:u.usage_type||'biz', role:u.role||'client', plan:u.plan||'free',
     blocked:!!u.blocked, upgradeRequested:!!u.upgrade_requested,
-    upgradeRequestedAt:u.upgrade_requested_at, upgradeApprovedAt:u.upgrade_approved_at,
-    createdAt:u.created_at};
+    upgradeRequestedAt:u.upgrade_requested_at, logoData:u.logo_data, createdAt:u.created_at};
 }
 async function refreshUsersCache(){
   if(!sb) return usersCache;
-  const {data,error} = await sb.from('portal_users').select('*');
+  const {data,error} = await sb.rpc('admin_list_users');
   if(!error && data){
     const fresh={};
-    data.forEach(u=>{ fresh[u.email]=mapUserRow(u); });
+    data.forEach(u=>{ fresh[u.email]=mapAdminRow(u); });
     usersCache=fresh;
-  }
+  } else if(error){ console.error('refreshUsersCache error', error); }
   return usersCache;
 }
 function getUsers(){ return usersCache; }
+// Writes back any changed fields in the admin-panel cache to each user's profile
+// row. (Email changes and new-user creation are handled by their own dedicated
+// functions below, since those need auth.users, not just profiles.)
 function saveUsers(usersObj){
   usersCache = usersObj;
   if(!sb) return;
-  const rows = Object.entries(usersObj).map(([email,u])=>({
-    email, name:u.name||'', biz:u.biz||'', phone:u.phone||'', pass:u.pass||'',
-    usage_type:u.usage||'biz', role:u.role||'user', plan:u.plan||'free',
-    blocked:!!u.blocked, upgrade_requested:!!u.upgradeRequested,
-    upgrade_requested_at:u.upgradeRequestedAt||null,
-    created_at:u.createdAt||new Date().toISOString()
-  }));
-  if(rows.length) sb.from('portal_users').upsert(rows).then(({error})=>{ if(error) console.error('saveUsers sync error',error); });
-}
-let adminPassCache = null;
-async function fetchAdminPass(){
-  if(!sb){ adminPassCache = localStorage.getItem(ADMIN_PASS_KEY)||'Admin123!'; return adminPassCache; }
-  try{
-    const {data} = await sb.from('portal_settings').select('value').eq('key','admin_pass').maybeSingle();
-    adminPassCache = data?.value || 'Admin123!';
-  }catch(e){ adminPassCache = localStorage.getItem(ADMIN_PASS_KEY)||'Admin123!'; }
-  return adminPassCache;
-}
-function getAdminPass(){ return adminPassCache || localStorage.getItem(ADMIN_PASS_KEY) || 'Admin123!'; }
-function setAdminPass(newP){
-  adminPassCache = newP;
-  if(sb) sb.from('portal_settings').upsert({key:'admin_pass', value:newP}).then(({error})=>{ if(error) console.error('setAdminPass sync error', error); });
-  else localStorage.setItem(ADMIN_PASS_KEY, newP);
+  Object.entries(usersObj).forEach(([email,u])=>{
+    if(!u.id) return;
+    sb.from('profiles').update({
+      full_name:u.name||'', phone:u.phone||'', company_name:u.biz||'',
+      role:u.role||'client', plan:u.plan||'free', usage_type:u.usage||'biz',
+      blocked:!!u.blocked, upgrade_requested:!!u.upgradeRequested,
+      upgrade_requested_at:u.upgradeRequestedAt||null
+    }).eq('id', u.id).then(({error})=>{ if(error) console.error('saveUsers sync error',error); });
+  });
 }
 function openTerms(){ document.getElementById('terms-modal').classList.add('open'); }
 function closeTerms(){ document.getElementById('terms-modal').classList.remove('open'); }
@@ -1236,26 +1225,25 @@ function showAuthTab(tab,btn){
   document.getElementById('auth-register').style.display = tab==='register' ? 'block' : 'none';
 }
 
+
 async function doLogin(){
   const email = document.getElementById('login-email').value.trim().toLowerCase();
   const pass = document.getElementById('login-pass').value;
   const err = document.getElementById('login-error');
   err.style.display = 'none';
-  if(email===ADMIN_EMAIL && pass===getAdminPass()){
-    currentUser = {email, name:'מנהל', biz:"פריים לדג'ר", role:'admin', plan:'pro', usage:'biz'};
-    enterPortal(); return;
-  }
-  let userRow=null;
-  if(sb){
-    const {data} = await sb.from('portal_users').select('*').eq('email',email).maybeSingle();
-    if(data) userRow = mapUserRow(data);
-  } else {
-    userRow = getUsers()[email];
-  }
-  if(!userRow || userRow.pass!==pass){ err.style.display='block'; return; }
-  if(userRow.blocked){ err.textContent='חשבון זה חסום. פנה למנהל: 055-502-7988'; err.style.display='block'; return; }
-  usersCache[email]=userRow; // seed cache so single-user reads (requestUpgrade, changePassword) work this session
-  currentUser = {...userRow, email};
+  if(!sb){ err.textContent='שגיאת התחברות למערכת'; err.style.display='block'; return; }
+  const {data, error} = await sb.auth.signInWithPassword({email, password:pass});
+  if(error || !data?.user){ err.style.display='block'; return; }
+  const {data:profile, error:profErr} = await sb.from('profiles').select('*').eq('id',data.user.id).maybeSingle();
+  if(profErr || !profile){ err.textContent='שגיאה בטעינת הפרופיל'; err.style.display='block'; return; }
+  if(profile.blocked){ err.textContent='חשבון זה חסום. פנה למנהל: 055-502-7988'; err.style.display='block'; await sb.auth.signOut(); return; }
+  currentUser = {
+    id: data.user.id, email,
+    name: profile.full_name||'', biz: profile.company_name||'', phone: profile.phone||'',
+    role: profile.role||'client', plan: profile.plan||'free', usage: profile.usage_type||'biz',
+    blocked: !!profile.blocked, upgradeRequested: !!profile.upgrade_requested,
+    upgradeRequestedAt: profile.upgrade_requested_at
+  };
   enterPortal();
 }
 
@@ -1276,19 +1264,19 @@ async function doRegister(){
   if(pass.length<6){ err.textContent='הסיסמה חייבת לפחות 6 תווים'; err.style.display='block'; return; }
   if(!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)){ err.textContent='אימייל לא תקין'; err.style.display='block'; return; }
   if(!/^[0-9+\-\s]{7,15}$/.test(phone)){ err.textContent='טלפון לא תקין'; err.style.display='block'; return; }
-  const newUser = {name,biz,phone,pass,usage:usageEl.value,role:'user',plan:'free',blocked:false,createdAt:new Date().toISOString()};
-  if(sb){
-    const {data:existing} = await sb.from('portal_users').select('email').eq('email',email).maybeSingle();
-    if(existing){ err.textContent='משתמש עם אימייל זה כבר קיים'; err.style.display='block'; return; }
-    const {error} = await sb.from('portal_users').insert({
-      email, name, biz, phone, pass, usage_type:usageEl.value, role:'user', plan:'free', blocked:false
-    });
-    if(error){ err.textContent='שגיאת רישום: '+error.message; err.style.display='block'; return; }
-  } else {
-    const users = getUsers();
-    if(users[email]){ err.textContent='משתמש עם אימייל זה כבר קיים'; err.style.display='block'; return; }
+  if(!sb){ err.textContent='שגיאת מערכת'; err.style.display='block'; return; }
+
+  const {data, error} = await sb.auth.signUp({email, password:pass});
+  if(error){
+    err.textContent = /already|registered|exists/i.test(error.message) ? 'משתמש עם אימייל זה כבר קיים' : ('שגיאת רישום: '+error.message);
+    err.style.display='block'; return;
   }
-  usersCache[email]=newUser;
+  if(!data?.user){ err.textContent='שגיאת רישום'; err.style.display='block'; return; }
+  const {error:profErr} = await sb.from('profiles').insert({
+    id: data.user.id, full_name:name, phone, company_name:biz,
+    role:'client', plan:'free', usage_type:usageEl.value, blocked:false
+  });
+  if(profErr){ err.textContent='שגיאה ביצירת פרופיל: '+profErr.message; err.style.display='block'; return; }
   if(refCode) linkReferral(refCode, email);
   info.textContent='✅ ההרשמה הצליחה! ניתן להתחבר כעת מכל מכשיר.';
   info.style.display='block';
@@ -1299,6 +1287,7 @@ async function doRegister(){
 }
 
 function doLogout(){
+  if(sb) sb.auth.signOut();
   currentUser=null;
   if(adminNotifyInterval){ clearInterval(adminNotifyInterval); adminNotifyInterval=null; }
   document.title = ORIGINAL_TITLE;
@@ -1306,6 +1295,24 @@ function doLogout(){
   document.getElementById('portal-screen').classList.remove('visible');
   document.getElementById('login-email').value='';
   document.getElementById('login-pass').value='';
+}
+
+// Restores a logged-in session after a page refresh, instead of always forcing a
+// fresh login — a natural side benefit of moving to real Supabase Auth sessions.
+async function tryRestoreSession(){
+  if(!sb) return;
+  const {data:{session}} = await sb.auth.getSession();
+  if(!session?.user) return;
+  const {data:profile} = await sb.from('profiles').select('*').eq('id',session.user.id).maybeSingle();
+  if(!profile || profile.blocked) return;
+  currentUser = {
+    id: session.user.id, email: session.user.email,
+    name: profile.full_name||'', biz: profile.company_name||'', phone: profile.phone||'',
+    role: profile.role||'client', plan: profile.plan||'free', usage: profile.usage_type||'biz',
+    blocked: !!profile.blocked, upgradeRequested: !!profile.upgrade_requested,
+    upgradeRequestedAt: profile.upgrade_requested_at
+  };
+  enterPortal();
 }
 
 async function enterPortal(){
@@ -1355,7 +1362,7 @@ let adminNotifyInterval = null;
 const ORIGINAL_TITLE = document.title;
 async function checkAdminNotifications(){
   if(!sb || !currentUser || currentUser.role!=='admin') return;
-  const {data} = await sb.from('portal_users').select('email').eq('upgrade_requested',true);
+  const {data} = await sb.from('profiles').select('id').eq('upgrade_requested',true);
   const count = data ? data.length : 0;
   const badge = document.getElementById('admin-badge-count');
   if(count>0){
@@ -1388,7 +1395,7 @@ function uploadLogo(input){
   r.onload=e=>{
     const data=e.target.result;
     userLogoCache = data;
-    if(sb && currentUser) sb.from('portal_users').update({logo_data:data}).eq('email',currentUser.email).then(({error})=>{ if(error) console.error('logo sync error',error); });
+    if(sb && currentUser?.id) sb.from('profiles').update({logo_data:data}).eq('id',currentUser.id).then(({error})=>{ if(error) console.error('logo sync error',error); });
     else localStorage.setItem('pl_logo_'+(currentUser?currentUser.email:''), data);
     const prev=document.getElementById('preview-logo'); if(prev){prev.src=data;prev.style.display='block';}
     const btn=document.getElementById('btn-remove-logo'); if(btn) btn.style.display='inline-block';
@@ -1398,7 +1405,7 @@ function uploadLogo(input){
 }
 function removeLogo(){
   userLogoCache = null;
-  if(sb && currentUser) sb.from('portal_users').update({logo_data:null}).eq('email',currentUser.email).then(({error})=>{ if(error) console.error('logo remove sync error',error); });
+  if(sb && currentUser?.id) sb.from('profiles').update({logo_data:null}).eq('id',currentUser.id).then(({error})=>{ if(error) console.error('logo remove sync error',error); });
   else localStorage.removeItem('pl_logo_'+(currentUser?currentUser.email:''));
   const prev=document.getElementById('preview-logo'); if(prev){prev.src='';prev.style.display='none';}
   const btn=document.getElementById('btn-remove-logo'); if(btn) btn.style.display='none';
@@ -1417,7 +1424,7 @@ function openSettings(){
 }
 function closeSettings(){ document.getElementById('settings-modal').classList.remove('open'); }
 function saveSettings(){ clientName=document.getElementById('set-client-name').value.trim(); save(); closeSettings(); refreshAll(); }
-function changePassword(){
+async function changePassword(){
   const oldP=document.getElementById('set-pass-old').value;
   const newP=document.getElementById('set-pass-new').value;
   const confP=document.getElementById('set-pass-conf').value;
@@ -1426,14 +1433,13 @@ function changePassword(){
   if(!oldP||!newP||!confP){msg.textContent='יש למלא את כל השדות';return;}
   if(newP!==confP){msg.textContent='הסיסמאות החדשות אינן תואמות';return;}
   if(newP.length<6){msg.textContent='סיסמה חייבת לפחות 6 תווים';return;}
-  if(currentUser.role==='admin'){
-    if(oldP!==getAdminPass()){msg.textContent='הסיסמה הנוכחית שגויה';return;}
-    setAdminPass(newP);
-  } else {
-    const users=getUsers();
-    if(!users[currentUser.email]||users[currentUser.email].pass!==oldP){msg.textContent='הסיסמה הנוכחית שגויה';return;}
-    users[currentUser.email].pass=newP; saveUsers(users);
-  }
+  if(!sb||!currentUser){msg.textContent='שגיאת מערכת';return;}
+  // Re-authenticate with the OLD password first, to verify it's actually correct
+  // (updateUser() alone would happily change the password without checking this).
+  const {error:reauthErr} = await sb.auth.signInWithPassword({email:currentUser.email, password:oldP});
+  if(reauthErr){ msg.textContent='הסיסמה הנוכחית שגויה'; return; }
+  const {error} = await sb.auth.updateUser({password:newP});
+  if(error){ msg.textContent='שגיאה: '+error.message; return; }
   msg.style.background='#10b98120'; msg.style.color='#10b981'; msg.textContent='✅ הסיסמה שונתה!';
   setTimeout(()=>{['set-pass-old','set-pass-new','set-pass-conf'].forEach(id=>document.getElementById(id).value='');msg.style.display='none';},2500);
 }
@@ -1483,16 +1489,13 @@ function openUpgradeModal(msg){
   el('upgrade-modal').classList.add('open');
 }
 function closeUpgradeModal(){ el('upgrade-modal').classList.remove('open'); }
-function requestUpgrade(){
-  if(!currentUser || currentUser.role==='admin') return;
-  const users = getUsers();
-  if(users[currentUser.email]){
-    users[currentUser.email].upgradeRequested = true;
-    users[currentUser.email].upgradeRequestedAt = new Date().toISOString();
-    saveUsers(users);
-  }
+async function requestUpgrade(){
+  if(!currentUser || currentUser.role==='admin' || !sb) return;
+  const now = new Date().toISOString();
+  const {error} = await sb.from('profiles').update({upgrade_requested:true, upgrade_requested_at:now}).eq('id', currentUser.id);
+  if(error){ console.error('requestUpgrade error', error); return; }
   currentUser.upgradeRequested = true;
-  currentUser.upgradeRequestedAt = new Date().toISOString();
+  currentUser.upgradeRequestedAt = now;
   openUpgradeModal();
   renderPlansTab();
 }
@@ -2006,7 +2009,7 @@ function openEditUser(email){
   document.getElementById('edit-user-modal').classList.add('open');
 }
 function closeEditUser(){ document.getElementById('edit-user-modal').classList.remove('open'); }
-function saveEditUser(){
+async function saveEditUser(){
   const origEmail=document.getElementById('edit-orig-email').value;
   const newEmail=document.getElementById('edit-email').value.trim().toLowerCase();
   const newName=document.getElementById('edit-name').value.trim();
@@ -2018,30 +2021,42 @@ function saveEditUser(){
   const newStatus=document.getElementById('edit-status').value;
   const newPass=document.getElementById('edit-pass').value;
   const msg=document.getElementById('edit-user-msg');
-  if(!newName||!newEmail){ msg.style.display='block'; msg.style.background='#ef444420'; msg.style.color='#ef4444'; msg.textContent='שם ואימייל חובה'; return; }
+  const showErr=t=>{ msg.style.display='block'; msg.style.background='#ef444420'; msg.style.color='#ef4444'; msg.textContent=t; };
+  if(!newName||!newEmail){ showErr('שם ואימייל חובה'); return; }
   const users=getUsers();
-  if(newEmail!==origEmail && users[newEmail]){ msg.style.display='block'; msg.style.background='#ef444420'; msg.style.color='#ef4444'; msg.textContent='אימייל זה כבר קיים'; return; }
-  const updated={...users[origEmail], name:newName, biz:newBiz, phone:newPhone, role:newRole, plan:newPlan, usage:newUsage, blocked:newStatus==='blocked'};
-  if(newPass && newPass.length>=6) updated.pass=newPass;
-  if(newEmail!==origEmail){ users[newEmail]=updated; delete users[origEmail]; }
-  else { users[origEmail]=updated; }
-  saveUsers(users);
-  if(sb && newEmail!==origEmail) sb.from('portal_users').delete().eq('email',origEmail).then(({error})=>{ if(error) console.error('email-change cleanup error',error); });
+  const u=users[origEmail]; if(!u||!u.id){ showErr('משתמש לא נמצא'); return; }
+  if(newEmail!==origEmail && users[newEmail]){ showErr('אימייל זה כבר קיים'); return; }
+
+  const {error:profErr} = await sb.from('profiles').update({
+    full_name:newName, company_name:newBiz, phone:newPhone,
+    role:newRole, plan:newPlan, usage_type:newUsage, blocked:newStatus==='blocked'
+  }).eq('id', u.id);
+  if(profErr){ showErr('שגיאה: '+profErr.message); return; }
+
+  if(newEmail!==origEmail){
+    const {error:emailErr} = await sb.rpc('admin_update_user_email',{old_email:origEmail,new_email:newEmail});
+    if(emailErr){ showErr('שגיאה בעדכון אימייל: '+emailErr.message); return; }
+  }
+  if(newPass && newPass.length>=6){
+    const {error:passErr} = await sb.rpc('admin_reset_password',{target_email:origEmail,new_password:newPass});
+    if(passErr){ showErr('שגיאה באיפוס סיסמה: '+passErr.message); return; }
+  }
   msg.style.display='block'; msg.style.background='#10b98120'; msg.style.color='#10b981'; msg.textContent='✅ נשמר בהצלחה!';
-  setTimeout(()=>{ closeEditUser(); renderAdminPanel(); }, 1000);
+  setTimeout(()=>{ closeEditUser(); refreshUsersCache().then(renderAdminPanel); }, 1000);
 }
 
 function adminToggleBlock(email){
   const u=getUsers(); if(!u[email]) return;
   u[email].blocked=!u[email].blocked; saveUsers(u); renderAdminPanel();
 }
-function adminDeleteUser(email){
+async function adminDeleteUser(email){
   if(!confirm('למחוק את '+email+'?\nפעולה זו בלתי הפיכה!')) return;
-  const u=getUsers(); delete u[email]; saveUsers(u);
-  if(sb) sb.from('portal_users').delete().eq('email',email).then(({error})=>{ if(error) console.error('delete user sync error',error); });
+  const {error} = await sb.rpc('admin_delete_user',{target_email:email});
+  if(error){ alert('שגיאה: '+error.message); return; }
+  const u=getUsers(); delete u[email];
   renderAdminPanel();
 }
-function adminAddUser(){
+async function adminAddUser(){
   const name=document.getElementById('adm-new-name').value.trim();
   const biz=document.getElementById('adm-new-biz').value.trim();
   const email=document.getElementById('adm-new-email').value.trim().toLowerCase();
@@ -2051,13 +2066,13 @@ function adminAddUser(){
   const plan=document.getElementById('adm-new-plan').value;
   const usage=document.getElementById('adm-new-usage').value;
   if(!name||!email||!pass){ alert('נא למלא שם, אימייל וסיסמה'); return; }
-  const u=getUsers(); if(u[email]){ alert('משתמש עם אימייל זה כבר קיים'); return; }
-  u[email]={name,biz,phone,pass,role,plan,usage,blocked:false,createdAt:new Date().toISOString()};
-  saveUsers(u);
+  if(pass.length<6){ alert('סיסמה חייבת לפחות 6 תווים'); return; }
+  const {error} = await sb.rpc('admin_create_user',{p_email:email,p_password:pass,p_name:name,p_phone:phone,p_biz:biz,p_role:role,p_usage:usage,p_plan:plan});
+  if(error){ alert('שגיאה: '+error.message); return; }
   ['adm-new-name','adm-new-biz','adm-new-email','adm-new-phone','adm-new-pass'].forEach(id=>document.getElementById(id).value='');
-  renderAdminPanel(); alert('✅ לקוח נוסף בהצלחה!');
+  await refreshUsersCache(); renderAdminPanel(); alert('✅ לקוח נוסף בהצלחה!');
 }
-function adminChangePass(){
+async function adminChangePass(){
   const oldP=document.getElementById('adm-pass-old').value;
   const newP=document.getElementById('adm-pass-new').value;
   const confP=document.getElementById('adm-pass-conf').value;
@@ -2066,8 +2081,10 @@ function adminChangePass(){
   if(!oldP||!newP||!confP){msg.textContent='יש למלא את כל השדות';return;}
   if(newP!==confP){msg.textContent='הסיסמאות אינן תואמות';return;}
   if(newP.length<6){msg.textContent='סיסמה חייבת לפחות 6 תווים';return;}
-  if(oldP!==getAdminPass()){msg.textContent='הסיסמה הנוכחית שגויה';return;}
-  setAdminPass(newP);
+  const {error:reauthErr} = await sb.auth.signInWithPassword({email:currentUser.email, password:oldP});
+  if(reauthErr){ msg.textContent='הסיסמה הנוכחית שגויה'; return; }
+  const {error} = await sb.auth.updateUser({password:newP});
+  if(error){ msg.textContent='שגיאה: '+error.message; return; }
   msg.style.background='#10b98120'; msg.style.color='#10b981'; msg.textContent='✅ הסיסמה שונתה!';
   setTimeout(()=>{['adm-pass-old','adm-pass-new','adm-pass-conf'].forEach(id=>document.getElementById(id).value='');msg.style.display='none';},2500);
 }
@@ -2142,7 +2159,7 @@ async function saveUserData(){
       frequency:r.frequency||'monthly', day_of_month:r.dayOfMonth||null, category:r.category||'',
       bp:r.bp||'biz', acct_id:r.acctId||null, active:r.active!==false
     })));
-    await sb.from('portal_users').update({display_name:clientName||null, upload_history:uploadHistory||[]}).eq('email', email);
+    if(currentUser.id) await sb.from('profiles').update({display_name:clientName||null, upload_history:uploadHistory||[]}).eq('id', currentUser.id);
   }catch(e){ console.error('saveUserData sync error', e); }
 }
 async function loadUserData(){
@@ -2161,7 +2178,7 @@ async function loadUserData(){
       sb.from('portal_accounts').select('*').eq('client_email',email),
       sb.from('portal_bank_rows').select('*').eq('client_email',email),
       sb.from('portal_records').select('*').eq('client_email',email),
-      sb.from('portal_users').select('display_name,upload_history,logo_data').eq('email',email).maybeSingle(),
+      sb.from('profiles').select('display_name,upload_history,logo_data').eq('id',currentUser.id).maybeSingle(),
       sb.from('portal_recurring_items').select('*').eq('client_email',email)
     ]);
     accounts = (accD||[]).map(a=>({id:a.id,name:a.name,type:a.type,opening:Number(a.opening)||0,limit:Number(a.credit_limit)||0,color:a.color}));
@@ -2660,6 +2677,40 @@ function getPK(d,p){
   return`${dt.getFullYear()}-W${String(w).padStart(2,"0")}`;
 }
 function getPL(k,p){ if(p==="month"){const[y,m]=k.split("-");return`${MONTHS[parseInt(m)-1]} ${y}`;} const[y,w]=k.split("-W");return`שב' ${w}/${y}`;}
+let showForecast = false;
+function toggleForecast(){
+  showForecast = !showForecast;
+  const btn = el('cf-forecast-toggle');
+  if(btn) btn.classList.toggle('active', showForecast);
+  if(btn) btn.style.background = showForecast ? '#8b5cf620' : '';
+  renderCF();
+}
+// Convert a recurring item's amount to an equivalent per-period figure, so a
+// monthly item shows correctly whether the chart is in week or month view.
+function getRecurringPerPeriodAmount(item, period){
+  const periodsPerYear = period==='month' ? 12 : 52;
+  const itemPeriodsPerYear = item.frequency==='monthly' ? 12 : item.frequency==='weekly' ? 52 : 1;
+  return item.amount * itemPeriodsPerYear / periodsPerYear;
+}
+function buildForecastPeriods(bf, p, count){
+  const today = new Date();
+  const periods = [];
+  for(let i=1; i<=count; i++){
+    const d = p==='month' ? new Date(today.getFullYear(), today.getMonth()+i, 15)
+                           : new Date(today.getTime() + i*7*86400000);
+    const k = getPK(d.toISOString(), p);
+    if(!k) continue;
+    let bizInc=0,bizExp=0,privInc=0,privExp=0;
+    recurringItems.filter(r=>r.active).forEach(r=>{
+      if(bf && bf!=='all' && r.bp!==bf) return;
+      const amt = getRecurringPerPeriodAmount(r, p);
+      if(r.type==='הכנסה'){ if(r.bp==='biz') bizInc+=amt; else privInc+=amt; }
+      else { if(r.bp==='biz') bizExp+=amt; else privExp+=amt; }
+    });
+    periods.push({k, label:getPL(k,p), bizInc,bizExp,privInc,privExp, forecast:true});
+  }
+  return periods;
+}
 function buildCFMap(af,bf,p){
   const map={};
   const add=(d,deb,cre,bp,ai)=>{
@@ -2678,19 +2729,26 @@ function renderCF(){
   const usage=currentUser?currentUser.usage||'biz':'biz';
   const effectiveBf=(usage==='priv'&&bf==='all')?'priv':bf;
   const cf=buildCFMap(af,effectiveBf,cfPeriod);
+  if(showForecast && recurringItems.some(r=>r.active)){
+    cf.push(...buildForecastPeriods(effectiveBf, cfPeriod, cfPeriod==='month'?6:8));
+  }
+  if(el("cf-forecast-note")) el("cf-forecast-note").style.display = showForecast ? "block" : "none";
   if(!cf.length){if(el("cf-empty"))el("cf-empty").style.display="block";if(el("cf-content"))el("cf-content").style.display="none";return;}
   if(el("cf-empty"))el("cf-empty").style.display="none"; if(el("cf-content"))el("cf-content").style.display="block";
   const maxV=Math.max(...cf.map(r=>Math.max(r.bizInc+r.privInc,r.bizExp+r.privExp)),1);
   if(el("bar-chart")) el("bar-chart").innerHTML=cf.map(row=>{
     const inc=row.bizInc+row.privInc, exp=row.bizExp+row.privExp, net=inc-exp;
-    return`<div class="bar-col"><div class="bar-bars">
-      <div class="bar" style="background:#10b981;height:${Math.max(3,(inc/maxV)*90)}px" title="הכנסות: ${fmt(inc)}"></div>
-      <div class="bar" style="background:#ef4444;height:${Math.max(3,(exp/maxV)*90)}px" title="הוצאות: ${fmt(exp)}"></div>
-    </div><div class="bar-lbl">${row.label}</div>
+    const fc=row.forecast;
+    return`<div class="bar-col" style="${fc?'opacity:.6':''}"><div class="bar-bars">
+      <div class="bar" style="background:#10b981;height:${Math.max(3,(inc/maxV)*90)}px;${fc?'border:1px dashed #10b981':''}" title="הכנסות: ${fmt(inc)}${fc?' (תחזית)':''}"></div>
+      <div class="bar" style="background:#ef4444;height:${Math.max(3,(exp/maxV)*90)}px;${fc?'border:1px dashed #ef4444':''}" title="הוצאות: ${fmt(exp)}${fc?' (תחזית)':''}"></div>
+    </div><div class="bar-lbl">${fc?'🔮 ':''}${row.label}</div>
     <div class="bar-net" style="color:${net>=0?"#10b981":"#ef4444"}">${net>=0?"+":""}${Math.round(net/1000)}K</div></div>`;
   }).join("");
-  const tBI=cf.reduce((s,r)=>s+r.bizInc,0), tBE=cf.reduce((s,r)=>s+r.bizExp,0);
-  const tPI=cf.reduce((s,r)=>s+r.privInc,0), tPE=cf.reduce((s,r)=>s+r.privExp,0);
+  // Summary totals reflect only actual (historical) data, not speculative forecast.
+  const actual = cf.filter(r=>!r.forecast);
+  const tBI=actual.reduce((s,r)=>s+r.bizInc,0), tBE=actual.reduce((s,r)=>s+r.bizExp,0);
+  const tPI=actual.reduce((s,r)=>s+r.privInc,0), tPE=actual.reduce((s,r)=>s+r.privExp,0);
   const sH=(val,col,lbl)=>`<div style="display:flex;justify-content:space-between;margin-bottom:6px;font-size:13px"><span style="color:var(--muted)">${lbl}</span><span style="color:${col};font-weight:700">${fmt(val)}</span></div>`;
   if(el("cf-biz-summary")) el("cf-biz-summary").innerHTML=sH(tBI,"#10b981","הכנסות")+sH(tBE,"#ef4444","הוצאות")+`<div style="height:1px;background:var(--border);margin:7px 0"></div><div style="display:flex;justify-content:space-between;font-size:13px;font-weight:700"><span>רווח נטו</span><span style="color:${tBI-tBE>=0?"#10b981":"#ef4444"}">${fmt(tBI-tBE)}</span></div>`;
   if(el("cf-priv-summary")) el("cf-priv-summary").innerHTML=sH(tPI,"#10b981","הכנסות")+sH(tPE,"#ef4444","הוצאות")+`<div style="height:1px;background:var(--border);margin:7px 0"></div><div style="display:flex;justify-content:space-between;font-size:13px;font-weight:700"><span>מאזן</span><span style="color:${tPI-tPE>=0?"#10b981":"#ef4444"}">${fmt(tPI-tPE)}</span></div>`;
@@ -2698,14 +2756,15 @@ function renderCF(){
   if(el("cf-tbody")) el("cf-tbody").innerHTML=cf.map(row=>{
     const inc=row.bizInc+row.privInc, exp=row.bizExp+row.privExp, net=inc-exp; cum+=net;
     const bN=row.bizInc-row.bizExp, pN=row.privInc-row.privExp;
-    return`<tr>
-      <td style="font-weight:600;white-space:nowrap">${row.label}</td>
+    const fc=row.forecast;
+    return`<tr style="${fc?'background:#8b5cf60c':''}">
+      <td style="font-weight:600;white-space:nowrap">${fc?'🔮 ':''}${row.label}</td>
       <td style="color:#10b981;font-weight:600">${fmt(row.bizInc)}</td><td style="color:#ef4444;font-weight:600">${fmt(row.bizExp)}</td>
       <td style="color:${bN>=0?"#10b981":"#ef4444"};font-weight:700">${bN>=0?"+":""}${fmt(bN)}</td>
       <td style="color:#10b981;font-weight:600">${fmt(row.privInc)}</td><td style="color:#ef4444;font-weight:600">${fmt(row.privExp)}</td>
       <td style="color:${pN>=0?"#10b981":"#ef4444"};font-weight:700">${pN>=0?"+":""}${fmt(pN)}</td>
       <td style="color:${net>=0?"#10b981":"#ef4444"};font-weight:800">${net>=0?"+":""}${fmt(net)}</td>
-      <td style="color:${cum>=0?"#10b981":"#ef4444"};font-weight:800">${fmt(cum)}</td>
+      <td style="color:${cum>=0?"#10b981":"#ef4444"};font-weight:800">${fmt(cum)}${fc?' 🔮':''}</td>
     </tr>`;
   }).join("");
   const tI=tBI+tPI, tE=tBE+tPE;
@@ -2833,7 +2892,7 @@ function refreshAll(){
 // ── INIT ──
 document.addEventListener('DOMContentLoaded',()=>{
   loadTheme();
-  fetchAdminPass();
+  tryRestoreSession();
   if(el("r-date")) el("r-date").value=new Date().toISOString().slice(0,10);
   refreshCatSelect();
   refreshRecurringCatSelect();
