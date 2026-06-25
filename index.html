@@ -453,6 +453,7 @@ h2{font-size:16px;font-weight:800;margin-bottom:4px}
       <button class="side-btn active" onclick="switchPortalTab('home',this)"><span class="side-icon">🏠</span> ראשי</button>
       <button class="side-btn" onclick="switchPortalTab('cashflow',this)"><span class="side-icon">💹</span> תזרים מזומנים</button>
       <button class="side-btn" onclick="switchPortalTab('recurring',this)"><span class="side-icon">🔁</span> הכנסות/הוצאות קבועות</button>
+      <button class="side-btn" onclick="switchPortalTab('loans',this)"><span class="side-icon">🏦</span> הלוואות</button>
       <div class="sidebar-section" id="admin-sb-section" style="display:none">ניהול מנהל</div>
       <button class="side-btn" id="admin-sb-btn" style="display:none" onclick="switchPortalTab('admin',this)"><span class="side-icon">👑</span> פאנל מנהל <span class="side-badge" id="admin-badge-count" style="display:none">0</span></button>
       <div class="sidebar-section">מידע</div>
@@ -1027,13 +1028,13 @@ h2{font-size:16px;font-weight:800;margin-bottom:4px}
           </div>
           <div class="form-grid" style="grid-template-columns:1fr 1fr">
             <div><div class="form-label">תדירות</div>
-              <select id="rec-frequency" onchange="toggleRecurringDay()">
+              <select id="rec-frequency">
                 <option value="monthly">חודשי</option>
                 <option value="weekly">שבועי</option>
                 <option value="yearly">שנתי</option>
               </select>
             </div>
-            <div id="rec-day-wrap"><div class="form-label">יום בחודש (1-31)</div><input type="number" id="rec-day" min="1" max="31" placeholder="1"></div>
+            <div id="rec-day-wrap"><div class="form-label">תאריך התחלה / תשלום הבא</div><input type="date" id="rec-start-date"></div>
           </div>
           <div class="form-grid" style="grid-template-columns:1fr 1fr">
             <div><div class="form-label">קטגוריה</div><select id="rec-cat"></select></div>
@@ -1051,6 +1052,60 @@ h2{font-size:16px;font-weight:800;margin-bottom:4px}
             <thead><tr><th>שם</th><th>סוג</th><th>סכום</th><th>תדירות</th><th>קטגוריה</th><th>עסקי/פרטי</th><th>פעיל</th><th class="no-print"></th></tr></thead>
             <tbody id="recurring-tbody"><tr><td colspan="8" style="color:var(--muted);text-align:center;padding:14px">אין פריטים קבועים עדיין</td></tr></tbody>
           </table></div>
+        </div>
+      </div>
+
+      <!-- LOANS TAB -->
+      <div id="ptab-loans" class="portal-tab">
+        <h2>🏦 הלוואות</h2>
+        <p class="subtitle">קרן, ריבית ולוח סילוקין — תשלומים נכנסים אוטומטית לתזרים, בלי רישום ידני</p>
+
+        <div class="card no-print">
+          <div class="sec-title">הוסף הלוואה</div>
+          <div style="display:flex;gap:10px;margin-bottom:10px">
+            <div class="bp-toggle">
+              <button class="bp-btn biz active" id="loan-bp-biz" onclick="setLoanBP('biz')">🏢 עסקי</button>
+              <button class="bp-btn priv" id="loan-bp-priv" onclick="setLoanBP('priv')">🏠 פרטי</button>
+            </div>
+          </div>
+          <div class="form-grid" style="grid-template-columns:1fr 1fr">
+            <div><div class="form-label">שם ההלוואה</div><input id="loan-name" placeholder='למשל: "הלוואת רכב — בנק לאומי"'></div>
+            <div><div class="form-label">קרן (₪)</div><input type="number" id="loan-principal" placeholder="40000" oninput="updateLoanPreview()"></div>
+          </div>
+          <div class="form-grid" style="grid-template-columns:1fr 1fr">
+            <div><div class="form-label">אחוז ריבית</div><input type="number" id="loan-rate" placeholder="10" oninput="updateLoanPreview()"></div>
+            <div><div class="form-label">סוג הריבית</div>
+              <select id="loan-rate-mode" onchange="updateLoanPreview()">
+                <option value="annual">שנתית (כמו בבנק — ריבית-דריבית)</option>
+                <option value="total">כוללת לכל התקופה (פשוטה)</option>
+              </select>
+            </div>
+          </div>
+          <div class="form-grid" style="grid-template-columns:1fr 1fr">
+            <div><div class="form-label">מספר תשלומים (חודשים)</div><input type="number" id="loan-term" placeholder="36" oninput="updateLoanPreview()"></div>
+            <div><div class="form-label">תאריך תשלום ראשון</div><input type="date" id="loan-start-date"></div>
+          </div>
+          <div class="form-grid" style="grid-template-columns:1fr">
+            <div><div class="form-label">חשבון (אופציונלי)</div><select id="loan-acct"><option value="">-- ללא --</option></select></div>
+          </div>
+          <div id="loan-preview" style="display:none;background:var(--surface);border-radius:8px;padding:10px 12px;margin-bottom:10px;font-size:12px;color:var(--muted2)"></div>
+          <button class="btn-solid" onclick="addLoan()" style="width:100%;margin-top:4px">+ הוסף הלוואה</button>
+        </div>
+
+        <div id="loans-list"><div class="card" style="text-align:center;color:var(--muted);padding:24px">אין הלוואות עדיין</div></div>
+
+        <!-- Amortization schedule modal -->
+        <div class="modal-bg" id="loan-schedule-modal" onclick="if(event.target===this)closeLoanSchedule()">
+          <div class="modal" style="max-width:600px;max-height:85vh;overflow-y:auto">
+            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px">
+              <span style="font-weight:800;font-size:14px" id="loan-schedule-title">לוח סילוקין</span>
+              <button class="btn btn-sm" onclick="closeLoanSchedule()">✕</button>
+            </div>
+            <div class="tbl-wrap"><table class="tbl">
+              <thead><tr><th>#</th><th>תאריך</th><th>תשלום</th><th>קרן</th><th>ריבית</th><th>יתרה</th></tr></thead>
+              <tbody id="loan-schedule-tbody"></tbody>
+            </table></div>
+          </div>
         </div>
       </div>
 
@@ -1645,6 +1700,36 @@ function getComputedReminders(){
   if(daysSinceImport>35){
     reminders.push({title:'📥 לא יובא דף בנק זה זמן רב', message:'נראה שלא ייבאת דף בנק בחודש האחרון — ייבוא שוטף עוזר לדייק את התזרים.', computed:true});
   }
+  // Upcoming fixed (recurring) payments/income — computed fresh each time, so it
+  // naturally disappears once the date passes (the engine will have posted it by
+  // then and advanced nextDueDate forward, just like the other computed reminders
+  // above re-evaluate from current state rather than needing manual dismissal).
+  const REMINDER_WINDOW_DAYS = 3;
+  recurringItems.filter(r=>r.active && r.nextDueDate).forEach(r=>{
+    const due = new Date(r.nextDueDate);
+    const daysUntil = Math.ceil((due - today) / 86400000);
+    if(daysUntil >= 0 && daysUntil <= REMINDER_WINDOW_DAYS){
+      const isIncome = r.type==='הכנסה';
+      const whenText = daysUntil===0 ? 'היום' : daysUntil===1 ? 'מחר' : `בעוד ${daysUntil} ימים`;
+      reminders.push({
+        title: (isIncome?'💰 ':'📤 ')+r.name+' — '+whenText,
+        message: `${isIncome?'הכנסה':'הוצאה'} קבועה של ${fmt(r.amount)} ${isIncome?'צפויה':'צפויה לרדת'} בתאריך ${due.toLocaleDateString('he-IL')}.`,
+        computed:true
+      });
+    }
+  });
+  loans.filter(l=>l.active && l.nextDueDate).forEach(l=>{
+    const due = new Date(l.nextDueDate);
+    const daysUntil = Math.ceil((due - today) / 86400000);
+    if(daysUntil >= 0 && daysUntil <= REMINDER_WINDOW_DAYS){
+      const whenText = daysUntil===0 ? 'היום' : daysUntil===1 ? 'מחר' : `בעוד ${daysUntil} ימים`;
+      reminders.push({
+        title: '🏦 '+l.name+' — '+whenText,
+        message: `תשלום הלוואה של ${fmt(l.monthlyPayment)} (${l.paymentsMade+1}/${l.termMonths}) צפוי לרדת בתאריך ${due.toLocaleDateString('he-IL')}.`,
+        computed:true
+      });
+    }
+  });
   return reminders;
 }
 async function loadReminders(){
@@ -2135,9 +2220,11 @@ async function saveUserData(){
   try{
     // Full-replace sync (same "this is the complete truth" model the old
     // localStorage write used) — children deleted before parent to respect FKs.
-    await sb.from('portal_records').delete().eq('client_email', email);
+    // Records auto-posted by the recurring-items engine (recurring_item_id set)
+    // are server-managed — never deleted/overwritten by the client's full-replace
+    // sync, or a stale local session could wipe out a payment the server just posted.
+    await sb.from('portal_records').delete().eq('client_email', email).is('recurring_item_id', null).is('loan_id', null).not('id','like','wa-%');
     await sb.from('portal_bank_rows').delete().eq('client_email', email);
-    await sb.from('portal_recurring_items').delete().eq('client_email', email);
     await sb.from('portal_accounts').delete().eq('client_email', email);
     if(accounts.length) await sb.from('portal_accounts').insert(accounts.map(a=>({
       id:a.id, client_email:email, name:a.name||'', type:a.type||'bank',
@@ -2149,16 +2236,16 @@ async function saveUserData(){
       description:r.description||'', debit:r.debit||0, credit:r.credit||0,
       matched:!!r.matched, manual_entry_id:r.manualEntryId||null, bp:r.bp||'biz'
     })));
-    if(records.length) await sb.from('portal_records').insert(records.map(r=>({
+    const manualRecords = records.filter(r=>!r.recurringItemId && !r.loanId && !(r.id&&r.id.startsWith('wa-')));
+    if(manualRecords.length) await sb.from('portal_records').insert(manualRecords.map(r=>({
       id:r.id, client_email:email, record_date:String(r.date||''),
       description:r.description||'', amount:r.amount||0, type:r.type, bp:r.bp||'biz',
       category:r.category||'', acct_id:r.acctId||null, matched:!!r.matched, bank_row_id:r.bankRowId||null
     })));
-    if(recurringItems.length) await sb.from('portal_recurring_items').insert(recurringItems.map(r=>({
-      id:r.id, client_email:email, name:r.name||'', type:r.type||'הוצאה', amount:r.amount||0,
-      frequency:r.frequency||'monthly', day_of_month:r.dayOfMonth||null, category:r.category||'',
-      bp:r.bp||'biz', acct_id:r.acctId||null, active:r.active!==false
-    })));
+    // portal_recurring_items is intentionally NOT part of this bulk sync — see
+    // addRecurringItem/deleteRecurringItem/toggleRecurringActive, which use
+    // direct targeted calls instead, to avoid clobbering next_due_date values
+    // the server-side engine advances independently.
     if(currentUser.id) await sb.from('profiles').update({display_name:clientName||null, upload_history:uploadHistory||[]}).eq('id', currentUser.id);
   }catch(e){ console.error('saveUserData sync error', e); }
 }
@@ -2174,23 +2261,32 @@ async function loadUserData(){
   }
   const email = currentUser.email;
   try{
-    const [{data:accD},{data:bankD},{data:recD},{data:userD},{data:recurD}] = await Promise.all([
+    // Catch up any due recurring items/loan payments immediately on login, in
+    // addition to the daily server-side cron — so the user doesn't have to wait
+    // until 5am to see a payment that's due today.
+    if(typeof sb.rpc === 'function'){
+      await sb.rpc('process_due_recurring_items').catch(e=>console.error('process_due_recurring_items error',e));
+      await sb.rpc('process_due_loan_payments').catch(e=>console.error('process_due_loan_payments error',e));
+    }
+    const [{data:accD},{data:bankD},{data:recD},{data:userD},{data:recurD},{data:loanD}] = await Promise.all([
       sb.from('portal_accounts').select('*').eq('client_email',email),
       sb.from('portal_bank_rows').select('*').eq('client_email',email),
       sb.from('portal_records').select('*').eq('client_email',email),
       sb.from('profiles').select('display_name,upload_history,logo_data').eq('id',currentUser.id).maybeSingle(),
-      sb.from('portal_recurring_items').select('*').eq('client_email',email)
+      sb.from('portal_recurring_items').select('*').eq('client_email',email),
+      sb.from('portal_loans').select('*').eq('client_email',email)
     ]);
     accounts = (accD||[]).map(a=>({id:a.id,name:a.name,type:a.type,opening:Number(a.opening)||0,limit:Number(a.credit_limit)||0,color:a.color}));
     bankRows = (bankD||[]).map(r=>({id:r.id,acctId:r.acct_id,date:r.row_date,description:r.description,debit:Number(r.debit)||0,credit:Number(r.credit)||0,matched:!!r.matched,manualEntryId:r.manual_entry_id,bp:r.bp}));
-    records = (recD||[]).map(r=>({id:r.id,date:r.record_date,description:r.description,amount:Number(r.amount)||0,type:r.type,bp:r.bp,category:r.category,acctId:r.acct_id,matched:!!r.matched,bankRowId:r.bank_row_id}));
+    records = (recD||[]).map(r=>({id:r.id,date:r.record_date,description:r.description,amount:Number(r.amount)||0,type:r.type,bp:r.bp,category:r.category,acctId:r.acct_id,matched:!!r.matched,bankRowId:r.bank_row_id,recurringItemId:r.recurring_item_id,loanId:r.loan_id}));
     clientName = userD?.display_name || '';
     uploadHistory = userD?.upload_history || [];
     userLogoCache = userD?.logo_data || null;
-    recurringItems = (recurD||[]).map(r=>({id:r.id,name:r.name,type:r.type,amount:Number(r.amount)||0,frequency:r.frequency,dayOfMonth:r.day_of_month,category:r.category,bp:r.bp,acctId:r.acct_id,active:r.active!==false}));
+    recurringItems = (recurD||[]).map(r=>({id:r.id,name:r.name,type:r.type,amount:Number(r.amount)||0,frequency:r.frequency,dayOfMonth:r.day_of_month,nextDueDate:r.next_due_date,category:r.category,bp:r.bp,acctId:r.acct_id,active:r.active!==false}));
+    loans = (loanD||[]).map(l=>({id:l.id,name:l.name,principal:Number(l.principal)||0,ratePercent:Number(l.rate_percent)||0,rateMode:l.rate_mode,termMonths:l.term_months,startDate:l.start_date,monthlyPayment:Number(l.monthly_payment)||0,bp:l.bp,acctId:l.acct_id,category:l.category,nextDueDate:l.next_due_date,paymentsMade:l.payments_made||0,active:l.active!==false}));
   }catch(e){
     console.error('loadUserData fetch error', e);
-    accounts=[]; bankRows=[]; records=[]; clientName=''; uploadHistory=[]; recurringItems=[];
+    accounts=[]; bankRows=[]; records=[]; clientName=''; uploadHistory=[]; recurringItems=[]; loans=[];
   }
 }
 
@@ -2200,8 +2296,8 @@ let dashAcct='all', dashView='all', dashPeriod='week', recAcct='all', cfPeriod='
 let recordType='הוצאה', recordBP='biz', selRec=null, selBank=null;
 const MONTHS=["ינו'","פבר'","מרס'","אפר'","מאי","יונ'","יול'","אוג'","ספט'","אוק'","נוב'","דצמ'"];
 const COLORS=["#3b82f6","#8b5cf6","#f59e0b","#10b981","#ef4444","#06b6d4","#f97316","#84cc16"];
-const COUT_BIZ=["שכירות עסקי","שכר עובדים","דלק","חשמל/מים","טלפון/אינטרנט","פרסום/שיווק","ציוד משרדי","הוצאות נסיעה","מסים ואגרות","ביטוח עסקי","ספקים","כיבודים","תחזוקה","הוצאות בנק","אחר עסקי"];
-const COUT_PRI=["שכירות","מזון","סופרמרקט","דלק","חשמל","מים/ארנונה","טלפון","ביטוח","רכב/תחבורה","בריאות","חינוך","פנאי/בידור","בגדים","אחר פרטי"];
+const COUT_BIZ=["שכירות עסקי","שכר עובדים","דלק","חשמל/מים","טלפון/אינטרנט","פרסום/שיווק","ציוד משרדי","הוצאות נסיעה","מסים ואגרות","ביטוח עסקי","ספקים","כיבודים","תחזוקה","הוצאות בנק","החזר הלוואה עסקית","מנויים ותוכנות","אחר עסקי"];
+const COUT_PRI=["שכירות","מזון","סופרמרקט","דלק","חשמל","מים/ארנונה","טלפון","ביטוח","רכב/תחבורה","בריאות","חינוך","פנאי/בידור","בגדים","החזר הלוואה/משכנתא","מנויים (סטרימינג/חבר)","אחר פרטי"];
 const CIN_BIZ=["הכנסות לקוחות","שכר/משכורת","דמי ניהול","השקעות","מענקים","החזרים","אחר הכנסה עסקי"];
 const CIN_PRI=["משכורת","קצבה",'שכ"ד',"ריבית/דיבידנד","מתנות","החזר מס","אחר הכנסה פרטי"];
 const fmt=n=>new Intl.NumberFormat("he-IL",{style:"currency",currency:"ILS",maximumFractionDigits:0}).format(n||0);
@@ -2264,30 +2360,42 @@ function getRecurringCats(){ if(recurringType==="הוצאה") return recurringBP
 function refreshRecurringCatSelect(){ const s=el("rec-cat"); if(!s) return; s.innerHTML=getRecurringCats().map(c=>`<option>${c}</option>`).join(""); }
 function setRecurringType(t){ recurringType=t; if(el("rec-type-out"))el("rec-type-out").classList.toggle("active",t==="הוצאה"); if(el("rec-type-in"))el("rec-type-in").classList.toggle("active",t==="הכנסה"); refreshRecurringCatSelect(); }
 function setRecurringBP(bp){ recurringBP=bp; if(el("rec-bp-biz"))el("rec-bp-biz").classList.toggle("active",bp==="biz"); if(el("rec-bp-priv"))el("rec-bp-priv").classList.toggle("active",bp==="priv"); refreshRecurringCatSelect(); }
-function toggleRecurringDay(){
-  const freq=el("rec-frequency").value, wrap=el("rec-day-wrap");
-  if(wrap) wrap.style.display = freq==="monthly" ? "block" : "none";
-}
 function addRecurringItem(){
   const name=el("rec-name").value.trim(), amount=parseFloat(el("rec-amount").value);
   if(!name||isNaN(amount)||amount<=0){ alert("נא למלא שם וסכום"); return; }
   const frequency=el("rec-frequency").value;
-  const dayOfMonth = frequency==="monthly" ? (parseInt(el("rec-day").value)||1) : null;
-  recurringItems.push({
-    id:"rec-"+Date.now(), name, type:recurringType, amount, frequency, dayOfMonth,
+  const startDate = el("rec-start-date").value || new Date().toISOString().slice(0,10);
+  const dayOfMonth = frequency==="monthly" ? new Date(startDate).getDate() : null;
+  const item = {
+    id:"rec-"+Date.now(), name, type:recurringType, amount, frequency, dayOfMonth, nextDueDate:startDate,
     category:el("rec-cat").value, bp:recurringBP, acctId:el("rec-acct").value||null, active:true
-  });
-  el("rec-name").value=""; el("rec-amount").value=""; el("rec-day").value="";
-  save(); renderRecurringItems();
+  };
+  recurringItems.push(item);
+  // Direct, targeted insert — recurring items are no longer part of the bulk
+  // full-replace sync, since the server-side engine advances next_due_date
+  // independently and a bulk overwrite could reset that progress.
+  if(sb && currentUser){
+    sb.from('portal_recurring_items').insert({
+      id:item.id, client_email:currentUser.email, name:item.name, type:item.type, amount:item.amount,
+      frequency:item.frequency, day_of_month:item.dayOfMonth, next_due_date:item.nextDueDate,
+      category:item.category, bp:item.bp, acct_id:item.acctId, active:true
+    }).then(({error})=>{ if(error) console.error('addRecurringItem error',error); });
+  }
+  el("rec-name").value=""; el("rec-amount").value=""; el("rec-start-date").value="";
+  updateHomeStats(); renderRecurringItems();
 }
 function deleteRecurringItem(id){
-  if(!confirm("למחוק פריט קבוע זה?")) return;
+  if(!confirm("למחוק פריט קבוע זה? (רישומים שכבר נוצרו ממנו בעבר יישארו)")) return;
   recurringItems = recurringItems.filter(r=>r.id!==id);
-  save(); renderRecurringItems();
+  if(sb) sb.from('portal_recurring_items').delete().eq('id',id).then(({error})=>{ if(error) console.error('deleteRecurringItem error',error); });
+  updateHomeStats(); renderRecurringItems();
 }
 function toggleRecurringActive(id){
   const item = recurringItems.find(r=>r.id===id);
-  if(item){ item.active = !item.active; save(); renderRecurringItems(); }
+  if(!item) return;
+  item.active = !item.active;
+  if(sb) sb.from('portal_recurring_items').update({active:item.active}).eq('id',id).then(({error})=>{ if(error) console.error('toggleRecurringActive error',error); });
+  updateHomeStats(); renderRecurringItems();
 }
 function freqLabel(f){ return f==="monthly"?"חודשי":f==="weekly"?"שבועי":f==="yearly"?"שנתי":f; }
 function renderRecurringItems(){
@@ -2305,7 +2413,7 @@ function renderRecurringItems(){
     <td>${r.name}</td>
     <td><span class="badge ${r.type==="הוצאה"?"br":"bg"}">${r.type}</span></td>
     <td style="color:${r.type==="הוצאה"?"var(--red)":"var(--accent)"};font-weight:700">${r.type==="הוצאה"?"-":"+"}${fmt(r.amount)}</td>
-    <td>${freqLabel(r.frequency)}${r.frequency==="monthly"&&r.dayOfMonth?` (יום ${r.dayOfMonth})`:""}</td>
+    <td>${freqLabel(r.frequency)}${r.nextDueDate?` <span style="color:var(--muted);font-size:11px">(הבא: ${r.nextDueDate})</span>`:""}</td>
     <td><span class="badge bb">${r.category||"—"}</span></td>
     <td><span class="badge ${r.bp==="biz"?"bb":"bp"}">${r.bp==="biz"?"🏢":"🏠"}</span></td>
     <td><button class="btn btn-sm ${r.active?"":"btn-red"}" onclick="toggleRecurringActive('${r.id}')">${r.active?"✓ פעיל":"⏸ מושבת"}</button></td>
@@ -2316,6 +2424,140 @@ function syncRecurringAcctSelect(){
   const sel = el("rec-acct");
   if(sel) sel.innerHTML = '<option value="">-- ללא --</option>' + accounts.map(a=>`<option value="${a.id}">${a.name}</option>`).join("");
 }
+
+// ── LOANS (Stage 3c+3d: amortization schedule + auto cashflow integration) ──
+let loans = [];
+let loanBP = 'biz';
+function setLoanBP(bp){
+  loanBP = bp;
+  if(el("loan-bp-biz")) el("loan-bp-biz").classList.toggle("active", bp==="biz");
+  if(el("loan-bp-priv")) el("loan-bp-priv").classList.toggle("active", bp==="priv");
+}
+function calcMonthlyPayment(principal, ratePercent, rateMode, termMonths){
+  if(rateMode === 'annual'){
+    const monthlyRate = ratePercent/100/12;
+    if(monthlyRate === 0) return principal/termMonths;
+    return principal * monthlyRate / (1 - Math.pow(1+monthlyRate, -termMonths));
+  } else { // 'total' — flat/simple interest spread evenly over the term
+    const totalInterest = principal * (ratePercent/100);
+    return (principal + totalInterest) / termMonths;
+  }
+}
+function buildAmortizationSchedule(loan){
+  const schedule = [];
+  let balance = loan.principal;
+  const monthlyRate = loan.rateMode==='annual' ? loan.ratePercent/100/12 : 0;
+  const flatInterestPerMonth = loan.rateMode==='total' ? (loan.principal*(loan.ratePercent/100))/loan.termMonths : 0;
+  const flatPrincipalPerMonth = loan.rateMode==='total' ? loan.principal/loan.termMonths : 0;
+  const startDate = new Date(loan.startDate);
+  for(let i=1; i<=loan.termMonths; i++){
+    let interestPortion, principalPortion;
+    if(loan.rateMode==='annual'){
+      interestPortion = balance * monthlyRate;
+      principalPortion = loan.monthlyPayment - interestPortion;
+    } else {
+      interestPortion = flatInterestPerMonth;
+      principalPortion = flatPrincipalPerMonth;
+    }
+    balance = Math.max(0, balance - principalPortion);
+    const d = new Date(startDate); d.setMonth(d.getMonth()+i-1);
+    schedule.push({n:i, date:d.toISOString().slice(0,10), payment:loan.monthlyPayment, principalPortion, interestPortion, balance});
+  }
+  return schedule;
+}
+function updateLoanPreview(){
+  const principal=parseFloat(el("loan-principal")?.value), rate=parseFloat(el("loan-rate")?.value)||0,
+        mode=el("loan-rate-mode")?.value||'annual', term=parseInt(el("loan-term")?.value);
+  const box = el("loan-preview");
+  if(!box) return;
+  if(!principal||!term||principal<=0||term<=0){ box.style.display='none'; return; }
+  const payment = calcMonthlyPayment(principal, rate, mode, term);
+  const totalPaid = payment*term;
+  box.style.display='block';
+  box.innerHTML = `תשלום חודשי משוער: <b style="color:var(--text)">${fmt(payment)}</b> · סה"כ ריבית לכל התקופה: <b style="color:var(--text)">${fmt(totalPaid-principal)}</b> · סה"כ לתשלום: <b style="color:var(--text)">${fmt(totalPaid)}</b>`;
+}
+function addLoan(){
+  const name=el("loan-name").value.trim();
+  const principal=parseFloat(el("loan-principal").value);
+  const rate=parseFloat(el("loan-rate").value)||0;
+  const mode=el("loan-rate-mode").value;
+  const term=parseInt(el("loan-term").value);
+  const startDate=el("loan-start-date").value || new Date().toISOString().slice(0,10);
+  const acctId=el("loan-acct").value||null;
+  if(!name||!principal||principal<=0||!term||term<=0){ alert("נא למלא שם, קרן ומספר תשלומים"); return; }
+  const monthlyPayment = calcMonthlyPayment(principal, rate, mode, term);
+  const loan = {
+    id:"loan-"+Date.now(), name, principal, ratePercent:rate, rateMode:mode, termMonths:term,
+    startDate, monthlyPayment, bp:loanBP, acctId, category:'החזר הלוואה/משכנתא',
+    nextDueDate:startDate, paymentsMade:0, active:true
+  };
+  loans.push(loan);
+  if(sb && currentUser){
+    sb.from('portal_loans').insert({
+      id:loan.id, client_email:currentUser.email, name:loan.name, principal:loan.principal,
+      rate_percent:loan.ratePercent, rate_mode:loan.rateMode, term_months:loan.termMonths,
+      start_date:loan.startDate, monthly_payment:loan.monthlyPayment, bp:loan.bp, acct_id:loan.acctId,
+      category:loan.category, next_due_date:loan.nextDueDate, payments_made:0, active:true
+    }).then(({error})=>{ if(error) console.error('addLoan error',error); });
+  }
+  ['loan-name','loan-principal','loan-rate','loan-term','loan-start-date'].forEach(id=>{const e=el(id); if(e) e.value='';});
+  if(el("loan-preview")) el("loan-preview").style.display='none';
+  renderLoans();
+}
+function deleteLoan(id){
+  if(!confirm("למחוק הלוואה זו? (תשלומים שכבר נוצרו ממנה יישארו ברישומים)")) return;
+  loans = loans.filter(l=>l.id!==id);
+  if(sb) sb.from('portal_loans').delete().eq('id',id).then(({error})=>{ if(error) console.error('deleteLoan error',error); });
+  renderLoans();
+}
+function syncLoanAcctSelect(){
+  const sel = el("loan-acct");
+  if(sel) sel.innerHTML = '<option value="">-- ללא --</option>' + accounts.map(a=>`<option value="${a.id}">${a.name}</option>`).join("");
+}
+function renderLoans(){
+  const wrap = el("loans-list");
+  if(!wrap) return;
+  if(!loans.length){ wrap.innerHTML = '<div class="card" style="text-align:center;color:var(--muted);padding:24px">אין הלוואות עדיין</div>'; return; }
+  wrap.innerHTML = loans.map(l=>{
+    const remaining = Math.max(0, l.termMonths - l.paymentsMade);
+    const sched = buildAmortizationSchedule(l);
+    const currentBalance = l.paymentsMade>0 ? sched[Math.min(l.paymentsMade,sched.length)-1].balance : l.principal;
+    const pctPaid = Math.round((l.paymentsMade/l.termMonths)*100);
+    return `<div class="card" style="border-right:3px solid ${l.active?'#8b5cf6':'#10b981'}">
+      <div style="display:flex;justify-content:space-between;align-items:start;flex-wrap:wrap;gap:8px;margin-bottom:8px">
+        <div>
+          <div style="font-weight:700;font-size:14px">${l.name} ${l.active?'':'<span class="badge bg">✓ שולמה במלואה</span>'}</div>
+          <div style="color:var(--muted);font-size:11px;margin-top:2px">${l.bp==='biz'?'🏢 עסקי':'🏠 פרטי'} · ${l.rateMode==='annual'?'ריבית שנתית':'ריבית כוללת'} ${l.ratePercent}% · ${l.termMonths} תשלומים</div>
+        </div>
+        <div style="display:flex;gap:6px">
+          <button class="btn btn-sm" onclick="openLoanSchedule('${l.id}')">📋 לוח סילוקין</button>
+          <button class="btn btn-red btn-sm" onclick="deleteLoan('${l.id}')">מחק</button>
+        </div>
+      </div>
+      <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-bottom:8px">
+        <div class="card2" style="margin:0"><div style="font-size:10px;color:var(--muted)">יתרה שנותרת לתשלום</div><div style="font-weight:800;font-size:14px;color:#ef4444">${fmt(currentBalance)}</div></div>
+        <div class="card2" style="margin:0"><div style="font-size:10px;color:var(--muted)">תשלום חודשי</div><div style="font-weight:800;font-size:14px">${fmt(l.monthlyPayment)}</div></div>
+        <div class="card2" style="margin:0"><div style="font-size:10px;color:var(--muted)">שולמו</div><div style="font-weight:800;font-size:14px">${l.paymentsMade}/${l.termMonths}</div></div>
+      </div>
+      <div class="cat-bg"><div class="cat-fill" style="width:${pctPaid}%;background:#8b5cf6"></div></div>
+      <div style="font-size:10px;color:var(--muted);margin-top:3px">${pctPaid}% מההלוואה שולם · תשלום הבא: ${l.active?l.nextDueDate:'—'}</div>
+    </div>`;
+  }).join("");
+}
+function openLoanSchedule(id){
+  const l = loans.find(x=>x.id===id); if(!l) return;
+  const sched = buildAmortizationSchedule(l);
+  el("loan-schedule-title").textContent = '📋 לוח סילוקין — '+l.name;
+  el("loan-schedule-tbody").innerHTML = sched.map(s=>`<tr style="${s.n<=l.paymentsMade?'opacity:.55':''}">
+    <td>${s.n}</td><td>${s.date}</td>
+    <td>${fmt(s.payment)}</td>
+    <td style="color:#10b981">${fmt(s.principalPortion)}</td>
+    <td style="color:#ef4444">${fmt(s.interestPortion)}</td>
+    <td style="font-weight:700">${fmt(s.balance)}</td>
+  </tr>`).join("");
+  el("loan-schedule-modal").classList.add("open");
+}
+function closeLoanSchedule(){ el("loan-schedule-modal").classList.remove("open"); }
 
 // ── ACCOUNTS ──
 function addAccount(){
@@ -2457,7 +2699,11 @@ function addRecord(){
 function deleteRecord(id){
   const r=records.find(x=>x.id===id);
   if(r&&r.bankRowId){const br=bankRows.find(b=>b.id===r.bankRowId);if(br){br.matched=false;br.manualEntryId=null;}}
-  records=records.filter(x=>x.id!==id); save(); refreshAll();
+  records=records.filter(x=>x.id!==id);
+  // Auto-posted records (recurring_item_id or loan_id set) are excluded from the
+  // bulk full-replace sync, so deleting one needs a direct, targeted delete call.
+  if(r && (r.recurringItemId || r.loanId || (r.id&&r.id.startsWith('wa-'))) && sb) sb.from('portal_records').delete().eq('id',id).then(({error})=>{ if(error) console.error('delete auto-posted record error',error); });
+  save(); refreshAll();
 }
 function renderRecords(){
   const usage=currentUser?currentUser.usage||'biz':'biz';
@@ -2472,7 +2718,7 @@ function renderRecords(){
   const dups=findDuplicates(); const dupIds=new Set(dups.filter(d=>d.type==="records").flatMap(d=>[d.a,d.b]));
   tb.innerHTML=f.sort((a,b)=>b.date.localeCompare(a.date)).map(r=>`<tr>
     <td>${r.date}</td>
-    <td>${r.description}${dupIds.has(r.id)?` <span class="badge" style="background:#ef444430;color:#ff6b6b">כפיל</span>`:""}</td>
+    <td>${r.description}${r.recurringItemId?` <span class="badge" style="background:#8b5cf630;color:#a78bfa">🔁 אוטומטי</span>`:""}${r.loanId?` <span class="badge" style="background:#8b5cf630;color:#a78bfa">🏦 הלוואה</span>`:""}${r.id&&r.id.startsWith('wa-')?` <span class="badge" style="background:#10b98130;color:#10b981">📷 וואטסאפ</span>`:""}${dupIds.has(r.id)?` <span class="badge" style="background:#ef444430;color:#ff6b6b">כפיל</span>`:""}</td>
     <td><span class="badge bb">${r.category}</span></td>
     <td><span class="badge ${r.type==="הוצאה"?"br":"bg"}">${r.type}</span></td>
     <td><span class="badge ${r.bp==="biz"?"bb":"bp"}">${r.bp==="biz"?"🏢":"🏠"}</span></td>
@@ -2707,6 +2953,11 @@ function buildForecastPeriods(bf, p, count){
       if(r.type==='הכנסה'){ if(r.bp==='biz') bizInc+=amt; else privInc+=amt; }
       else { if(r.bp==='biz') bizExp+=amt; else privExp+=amt; }
     });
+    loans.filter(l=>l.active).forEach(l=>{
+      if(bf && bf!=='all' && l.bp!==bf) return;
+      const amt = getRecurringPerPeriodAmount({amount:l.monthlyPayment, frequency:'monthly'}, p);
+      if(l.bp==='biz') bizExp+=amt; else privExp+=amt;
+    });
     periods.push({k, label:getPL(k,p), bizInc,bizExp,privInc,privExp, forecast:true});
   }
   return periods;
@@ -2887,6 +3138,7 @@ function refreshAll(){
   renderReconcile(); renderCF(); refreshDashboard(); showDupBanner(); updateHomeStats();
   if(typeof renderHealthScore==='function') renderHealthScore();
   syncRecurringAcctSelect(); renderRecurringItems();
+  syncLoanAcctSelect(); renderLoans();
 }
 
 // ── INIT ──
@@ -2896,7 +3148,6 @@ document.addEventListener('DOMContentLoaded',()=>{
   if(el("r-date")) el("r-date").value=new Date().toISOString().slice(0,10);
   refreshCatSelect();
   refreshRecurringCatSelect();
-  if(el("rec-day-wrap")) toggleRecurringDay();
   // Pre-fill referral code from ?ref=CODE link and open the register tab
   const urlRef = new URLSearchParams(location.search).get('ref');
   if(urlRef){
