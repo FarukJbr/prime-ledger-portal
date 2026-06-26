@@ -2216,6 +2216,7 @@ function exportUsersPDF(){
 function getKey(){ return 'fin_'+(currentUser?currentUser.email:'guest'); }
 async function saveUserData(){
   if(!sb || !currentUser){ try{ localStorage.setItem(getKey(), JSON.stringify({accounts,bankRows,records,clientName,uploadHistory,recurringItems})); }catch(e){} return; }
+  pendingSaveCount++;
   const email = currentUser.email;
   try{
     // Full-replace sync (same "this is the complete truth" model the old
@@ -2248,6 +2249,7 @@ async function saveUserData(){
     // the server-side engine advances independently.
     if(currentUser.id) await sb.from('profiles').update({display_name:clientName||null, upload_history:uploadHistory||[]}).eq('id', currentUser.id);
   }catch(e){ console.error('saveUserData sync error', e); }
+  finally{ pendingSaveCount = Math.max(0, pendingSaveCount-1); }
 }
 async function loadUserData(){
   if(!sb || !currentUser){
@@ -2291,6 +2293,10 @@ async function loadUserData(){
 }
 
 let clientName='', accounts=[], bankRows=[], records=[], uploadHistory=[], userLogoCache=null, recurringItems=[];
+let pendingSaveCount = 0; // protects against refreshing/closing mid-save (see saveUserData)
+window.addEventListener('beforeunload', (e)=>{
+  if(pendingSaveCount > 0){ e.preventDefault(); e.returnValue = ''; }
+});
 let recurringType='הוצאה', recurringBP='biz';
 let dashAcct='all', dashView='all', dashPeriod='week', recAcct='all', cfPeriod='week';
 let recordType='הוצאה', recordBP='biz', selRec=null, selBank=null;
