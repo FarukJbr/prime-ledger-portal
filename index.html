@@ -615,7 +615,7 @@ h2{font-size:16px;font-weight:800;margin-bottom:4px}
                 <div><div class="form-label">יתרת פתיחה (₪)</div><input type="number" id="acct-opening" placeholder="0"></div>
                 <div><div class="form-label">מסגרת אשראי (₪) — 0 = ללא</div><input type="number" id="acct-limit" placeholder="0"></div>
               </div>
-              <button class="btn-solid" onclick="addAccount()" style="width:100%;margin-top:4px">+ הוסף חשבון</button>
+              <button class="btn-solid" id="add-acct-btn" onclick="addAccount()" style="width:100%;margin-top:4px">+ הוסף חשבון</button>
             </div>
             <div class="card"><div class="sec-title">חשבונות <span id="acct-count" style="color:var(--muted);font-size:11px"></span></div><div id="accts-list"><div style="color:var(--muted);font-size:12px">אין חשבונות</div></div></div>
           </div>
@@ -707,7 +707,7 @@ h2{font-size:16px;font-weight:800;margin-bottom:4px}
                 <div><div class="form-label">סכום (₪)</div><input type="number" id="r-amount" placeholder="0.00"></div>
                 <div><div class="form-label">קטגוריה</div><select id="r-cat"></select></div>
               </div>
-              <button class="btn-solid" onclick="addRecord()" style="width:100%;margin-top:4px">+ הוסף רישום</button>
+              <button class="btn-solid" id="add-record-btn" onclick="addRecord()" style="width:100%;margin-top:4px">+ הוסף רישום</button>
             </div>
             <div class="card no-print" style="padding:10px 14px">
               <div style="display:flex;gap:7px;flex-wrap:wrap;align-items:center">
@@ -2396,7 +2396,7 @@ const el=id=>document.getElementById(id);
 const getA=id=>accounts.find(a=>a.id===id);
 const aC=id=>{const a=getA(id);return a?a.color:"var(--muted)";};
 const aN=id=>{const a=getA(id);return a?a.name:"—";};
-function save(){ saveUserData(); updateHomeStats(); }
+function save(){ const p = saveUserData(); updateHomeStats(); return p; }
 
 function updateHomeStats(){
   if(!currentUser) return;
@@ -2855,7 +2855,7 @@ function startSectionUpload(key){
 }
 
 // ── ACCOUNTS ──
-function addAccount(){
+async function addAccount(){
   const plan = PLANS[currentUser?.plan||'free']||PLANS.free;
   if(currentUser?.role!=='admin' && accounts.length>=plan.features.accounts){
     openUpgradeModal(`הגעת למספר החשבונות המקסימלי במנוי ${plan.name} (${plan.features.accounts}). שדרג למקצועי לחשבונות ללא הגבלה.`);
@@ -2864,7 +2864,16 @@ function addAccount(){
   const name=el("acct-name").value.trim(); if(!name){alert("נא להזין שם");return;}
   accounts.push({id:"acct-"+Date.now(),name,type:el("acct-type").value,opening:parseFloat(el("acct-opening").value)||0,limit:parseFloat(el("acct-limit").value)||0,color:COLORS[accounts.length%COLORS.length]});
   el("acct-name").value=""; el("acct-opening").value=""; el("acct-limit").value="";
-  save(); refreshAll();
+  refreshAll(); // show it locally right away
+  // Wait for the actual server round-trip before letting the save-tracking
+  // counter (and therefore the leave-page warning) clear — refreshing before
+  // this completes means the add genuinely hasn't reached the server yet, no
+  // amount of backend cleverness changes that, so the button visibly says
+  // "saving" for the brief window where leaving would lose the new account.
+  const btn = el('add-acct-btn');
+  if(btn){ btn.disabled = true; btn.textContent = 'שומר...'; }
+  await save();
+  if(btn){ btn.disabled = false; btn.textContent = '+ הוסף חשבון'; }
 }
 function deleteAccount(id){
   if(!confirm("למחוק?")) return;
@@ -2976,7 +2985,7 @@ function setDashView(v,btn){dashView=v;document.querySelectorAll("#tab-dashboard
 function setDashPeriod(v,btn){dashPeriod=v;document.querySelectorAll("#tab-dashboard .period-btn").forEach(b=>b.classList.remove("active"));btn.classList.add("active");if(el("dash-period-lbl"))el("dash-period-lbl").textContent=v==="week"?"שבועי":"חודשי";refreshDashboard();}
 
 // ── RECORDS ──
-function addRecord(){
+async function addRecord(){
   const plan = PLANS[currentUser?.plan||'free']||PLANS.free;
   if(currentUser?.role!=='admin' && records.length>=plan.features.records){
     openUpgradeModal(`הגעת למספר הרישומים המקסימלי במנוי ${plan.name} (${plan.features.records}). שדרג למקצועי לרישומים ללא הגבלה.`);
@@ -2989,7 +2998,12 @@ function addRecord(){
   const similar=records.find(r=>r.description.trim().toLowerCase()===desc.toLowerCase()&&Math.abs(r.amount-amount)<0.01&&r.type===recordType);
   if(similar&&!confirm(`💡 רישום דומה קיים:\n"${similar.description}"\nסכום: ${fmt(similar.amount)}\nתאריך: ${similar.date}\n\nהאם להוסיף בכל זאת?`)) return;
   records.push({id:"r-"+Date.now(),date:el("r-date").value||new Date().toISOString().slice(0,10),description:desc,amount,type:recordType,bp:recordBP,category:el("r-cat").value,acctId:el("r-acct").value||null,matched:false});
-  el("r-desc").value=""; el("r-amount").value=""; save(); refreshAll();
+  el("r-desc").value=""; el("r-amount").value="";
+  refreshAll();
+  const btn = el('add-record-btn');
+  if(btn){ btn.disabled = true; btn.textContent = 'שומר...'; }
+  await save();
+  if(btn){ btn.disabled = false; btn.textContent = '+ הוסף רישום'; }
 }
 function deleteRecord(id){
   const r=records.find(x=>x.id===id);
