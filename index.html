@@ -1130,8 +1130,15 @@ h2{font-size:16px;font-weight:800;margin-bottom:4px}
 
         <div id="files-inside-year" style="display:none">
           <button class="btn btn-sm no-print" onclick="closeTaxYearFolder()" style="margin-bottom:10px">→ חזרה לתיקיות</button>
+
+          <div class="card">
+            <div class="sec-title">📝 שאלון לקראת הדוח השנתי (טופס 1301) — שנת מס <span id="quest-year-label" style="color:var(--accent)"></span></div>
+            <p class="subtitle" style="margin-top:-4px">ענה על השאלות הבאות — זה עוזר למשרד להכין את הדוח שלך מהר ומדויק יותר. בכל שאלה שעונים "כן", אפשר גם לצרף קובץ רלוונטי במקום.</p>
+            <div id="questionnaire-body"></div>
+          </div>
+
           <div class="card no-print">
-            <div class="sec-title">תיקייה: שנת מס <span id="current-tax-year-label" style="color:var(--accent)"></span></div>
+            <div class="sec-title">תיקייה: שנת מס <span id="current-tax-year-label" style="color:var(--accent)"></span> — קבצים נוספים</div>
             <input type="file" id="tax-file-input" style="display:none" onchange="uploadTaxFile(this.files[0])">
             <button class="btn-solid" onclick="document.getElementById('tax-file-input').click()" style="width:100%">📤 העלה קובץ</button>
           </div>
@@ -2636,6 +2643,7 @@ function openTaxYearFolder(year){
   el('files-year-view').style.display = 'none';
   el('files-inside-year').style.display = 'block';
   loadTaxFiles();
+  loadQuestionnaire();
 }
 function closeTaxYearFolder(){
   currentTaxYear = null;
@@ -2651,10 +2659,15 @@ async function loadTaxFiles(){
   if(!files.length){ wrap.innerHTML = '<div class="card" style="text-align:center;color:var(--muted);padding:24px">אין קבצים בתיקייה זו עדיין</div>'; return; }
   wrap.innerHTML = files.map(f=>{
     const sizeKb = f.metadata?.size ? Math.round(f.metadata.size/1024) : '?';
+    // Files attached from a questionnaire section are stored as "key__filename" —
+    // show the section's icon + label instead of the raw prefix when present.
+    const sep = f.name.indexOf('__');
+    const sectionKey = sep>0 ? f.name.slice(0,sep) : null;
+    const section = sectionKey ? TAX_SECTIONS.find(s=>s.key===sectionKey) : null;
+    const displayName = section ? `${section.icon} ${f.name.slice(sep+2)}` : `📄 ${f.name}`;
     return `<div class="card2" style="display:flex;justify-content:space-between;align-items:center">
       <div style="display:flex;align-items:center;gap:8px;overflow:hidden">
-        <span style="font-size:18px">📄</span>
-        <div><div style="font-weight:600;font-size:12px">${f.name}</div><div style="font-size:10px;color:var(--muted)">${sizeKb} KB</div></div>
+        <div><div style="font-weight:600;font-size:12px">${displayName}</div><div style="font-size:10px;color:var(--muted)">${sizeKb} KB</div></div>
       </div>
       <div style="display:flex;gap:6px;flex-shrink:0">
         <button class="btn btn-sm" onclick="downloadTaxFile('${f.name}')">⬇️</button>
@@ -2665,7 +2678,12 @@ async function loadTaxFiles(){
 }
 async function uploadTaxFile(file){
   if(!file || !currentTaxYear) return;
-  const path = `${taxBasePath()}/${currentTaxYear}/${file.name}`;
+  // If this upload was started from a questionnaire section's "attach file"
+  // button, prefix the filename so it's recognizable in the flat file list
+  // (e.g. "donations__receipt.pdf") without needing real subfolders.
+  const finalName = pendingUploadSection ? `${pendingUploadSection}__${file.name}` : file.name;
+  pendingUploadSection = null;
+  const path = `${taxBasePath()}/${currentTaxYear}/${finalName}`;
   const {error} = await sb.storage.from(TAX_BUCKET).upload(path, file, {upsert:true});
   el('tax-file-input').value = '';
   if(error){ alert('שגיאה בהעלאה: '+error.message); return; }
@@ -2683,6 +2701,94 @@ async function deleteTaxFile(name){
   const {error} = await sb.storage.from(TAX_BUCKET).remove([path]);
   if(error){ alert('שגיאה: '+error.message); return; }
   loadTaxFiles();
+}
+
+// ── TAX QUESTIONNAIRE (mirrors the real appendices of טופס 1301) ──
+// Each section: a yes/no question plus optional detail fields, shown only
+// when the answer is "yes". File uploads from here go into the same
+// tax-document Storage folder as the general file list (just reuses
+// uploadTaxFile under the hood) so everything for the year lives in one place.
+const TAX_SECTIONS = [
+  {key:'salary', icon:'💼', q:'עבדת כשכיר השנה (קיבלת תלוש משכורת)?',
+    fields:[{id:'employer_count', label:'ממספר מעסיקים?', type:'number', placeholder:'1'}],
+    hint:'יש לצרף טופס 106 מכל מעסיק.'},
+  {key:'business', icon:'🧾', q:'הייתה לך הכנסה מעסק עצמאי או משלח יד?',
+    fields:[], hint:'דוח רווח והפסד יופק מנתוני "תזרים מזומנים" בפורטל — אין צורך להעלות בנפרד, אלא אם יש הכנסה שלא עברה בפורטל.'},
+  {key:'property', icon:'🏠', q:'הייתה לך הכנסה משכר דירה או מנכס אחר?',
+    fields:[{id:'property_count', label:'כמה נכסים?', type:'number', placeholder:'1'},{id:'monthly_rent', label:'שכ"ד חודשי משוער (₪)', type:'number', placeholder:'0'}],
+    hint:'מומלץ לצרף חוזה שכירות וקבלות.'},
+  {key:'securities', icon:'📈', q:'מכרת או החזקת ניירות ערך (מניות/אג"ח/קרנות) השנה?',
+    fields:[], hint:'יש לצרף טופס 867 מהבנק או מבית ההשקעות.'},
+  {key:'foreign', icon:'🌍', q:'הייתה לך הכנסה מחוץ לישראל?',
+    fields:[{id:'country', label:'באיזו מדינה?', type:'text', placeholder:'לדוגמה: ארה"ב'}],
+    hint:'יש לצרף אישור מס מרשות המס הזרה, אם קיים.'},
+  {key:'pension', icon:'💰', q:'הפקדת לקופת גמל, קרן פנסיה או קרן השתלמות השנה?',
+    fields:[], hint:'יש לצרף אישורי הפקדה שנתיים.'},
+  {key:'donations', icon:'🤝', q:'תרמת לעמותה מוכרת לפי סעיף 46?',
+    fields:[{id:'amount', label:'סכום כולל משוער (₪)', type:'number', placeholder:'0'}],
+    hint:'יש לצרף קבלות מקוריות מהעמותה.'},
+  {key:'control', icon:'🏢', q:'אתה בעל מניות (מעל 10%) בחברה פרטית?',
+    fields:[{id:'company_name', label:'שם החברה', type:'text', placeholder:''}], hint:''},
+  {key:'wealth', icon:'📋', q:'התבקשת ע"י רשות המסים להגיש הצהרת הון השנה?',
+    fields:[], hint:'אם כן, נציג מהמשרד ייצור איתך קשר לתיאום הפרטים.'},
+];
+let taxAnswers = {}; // section_key -> {has_income, details}
+let pendingUploadSection = null;
+
+async function loadQuestionnaire(){
+  if(!sb || !currentUser || !currentTaxYear) return;
+  el('quest-year-label').textContent = currentTaxYear;
+  const {data, error} = await sb.from('tax_questionnaire').select('*')
+    .eq('client_email', currentUser.email).eq('tax_year', currentTaxYear);
+  taxAnswers = {};
+  if(!error && data) data.forEach(row=>{ taxAnswers[row.section_key] = {has_income:row.has_income, details:row.details||{}}; });
+  renderQuestionnaire();
+}
+function renderQuestionnaire(){
+  const wrap = el('questionnaire-body'); if(!wrap) return;
+  wrap.innerHTML = TAX_SECTIONS.map(s=>{
+    const ans = taxAnswers[s.key] || {has_income:null, details:{}};
+    const yes = ans.has_income === true, no = ans.has_income === false;
+    return `<div class="card2" style="margin-bottom:8px">
+      <div style="display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap">
+        <div style="font-weight:600;font-size:13px">${s.icon} ${s.q}</div>
+        <div class="type-toggle no-print">
+          <button class="type-btn in${yes?' active':''}" onclick="setTaxAnswer('${s.key}',true)">כן</button>
+          <button class="type-btn out${no?' active':''}" onclick="setTaxAnswer('${s.key}',false)">לא</button>
+        </div>
+      </div>
+      ${yes ? `<div style="margin-top:8px;padding-top:8px;border-top:1px solid var(--border)">
+        ${s.fields.map(f=>`<div style="margin-bottom:6px"><div class="form-label">${f.label}</div>
+          <input type="${f.type}" placeholder="${f.placeholder||''}" value="${(ans.details&&ans.details[f.id])||''}"
+            onchange="setTaxDetail('${s.key}','${f.id}',this.value)"></div>`).join("")}
+        ${s.hint?`<div style="font-size:11px;color:var(--muted);margin-bottom:6px">💡 ${s.hint}</div>`:""}
+        <button class="btn btn-sm no-print" onclick="startSectionUpload('${s.key}')">📎 צרף קובץ לסעיף זה</button>
+      </div>` : ""}
+    </div>`;
+  }).join("");
+}
+async function setTaxAnswer(key, val){
+  taxAnswers[key] = taxAnswers[key] || {details:{}};
+  taxAnswers[key].has_income = val;
+  renderQuestionnaire();
+  await saveTaxAnswer(key);
+}
+async function setTaxDetail(key, fieldId, val){
+  taxAnswers[key] = taxAnswers[key] || {has_income:true, details:{}};
+  taxAnswers[key].details[fieldId] = val;
+  await saveTaxAnswer(key);
+}
+async function saveTaxAnswer(key){
+  if(!sb || !currentUser || !currentTaxYear) return;
+  const ans = taxAnswers[key] || {has_income:null, details:{}};
+  await sb.from('tax_questionnaire').upsert({
+    client_email: currentUser.email, tax_year: currentTaxYear, section_key: key,
+    has_income: ans.has_income, details: ans.details||{}
+  }, {onConflict:'client_email,tax_year,section_key'});
+}
+function startSectionUpload(key){
+  pendingUploadSection = key;
+  el('tax-file-input').click();
 }
 
 // ── ACCOUNTS ──
