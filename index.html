@@ -2352,6 +2352,20 @@ async function loadUserData(){
     recurringItems = (recurD||[]).map(r=>({id:r.id,name:r.name,type:r.type,amount:Number(r.amount)||0,frequency:r.frequency,dayOfMonth:r.day_of_month,nextDueDate:r.next_due_date,category:r.category,bp:r.bp,acctId:r.acct_id,active:r.active!==false}));
     loans = (loanD||[]).map(l=>({id:l.id,name:l.name,principal:Number(l.principal)||0,ratePercent:Number(l.rate_percent)||0,rateMode:l.rate_mode,termMonths:l.term_months,startDate:l.start_date,monthlyPayment:Number(l.monthly_payment)||0,bp:l.bp,acctId:l.acct_id,category:l.category,nextDueDate:l.next_due_date,paymentsMade:l.payments_made||0,active:l.active!==false}));
 
+    // TEMPORARY DIAGNOSTIC — visible on-page so we can see exactly what the
+    // server returned without needing dev tools. Safe to remove once the
+    // disappearing-data issue is fully understood; harmless if left in.
+    try{
+      let dbg = document.getElementById('debug-fetch-panel');
+      if(!dbg){
+        dbg = document.createElement('div');
+        dbg.id = 'debug-fetch-panel';
+        dbg.style = 'position:fixed;bottom:0;left:0;right:0;background:#000;color:#0f0;font-size:10px;padding:6px;z-index:99999;direction:ltr;text-align:left;font-family:monospace';
+        document.body.appendChild(dbg);
+      }
+      dbg.textContent = `[loadUserData ${new Date().toLocaleTimeString()}] accounts=${accounts.length} records=${records.length} bankRows=${bankRows.length} email=${email}`;
+    }catch(e){}
+
     // Defense in depth alongside the atomic sync RPC: if the server read
     // looks suspiciously emptier than what was known moments ago (e.g. a slow
     // connection still mid-save, or the page was reloaded before an add even
