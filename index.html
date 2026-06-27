@@ -808,6 +808,22 @@ h2{font-size:16px;font-weight:800;margin-bottom:4px}
           <div id="adm-ann-list"></div>
         </div>
 
+        <!-- TAX YEAR LOCK -->
+        <div class="card no-print">
+          <div class="sec-title">🔒 נעילת שנת מס (דוח שנתי 1301)</div>
+          <p class="subtitle" style="margin-top:-4px">לאחר שבדקת את השאלון של לקוח — נעל את השנה כדי שלא יוכל לשנות יותר.</p>
+          <div class="form-grid" style="grid-template-columns:1fr 1fr">
+            <div><div class="form-label">אימייל לקוח</div><input id="adm-lock-email" placeholder="client@email.com"></div>
+            <div><div class="form-label">שנת מס</div><input id="adm-lock-year" placeholder="2025"></div>
+          </div>
+          <div id="adm-lock-status" style="font-size:12px;color:var(--muted);margin-bottom:8px"></div>
+          <div style="display:flex;gap:8px">
+            <button class="btn btn-sm" onclick="checkTaxYearLock()">🔍 בדוק סטטוס</button>
+            <button class="btn-solid" onclick="setTaxYearLock(true)" style="background:var(--yellow);color:#000">🔒 נעל</button>
+            <button class="btn btn-red btn-sm" onclick="setTaxYearLock(false)">🔓 שחרר</button>
+          </div>
+        </div>
+
         <!-- SET PERSONAL REMINDER -->
         <div class="card no-print">
           <div class="sec-title">⏰ שלח תזכורת אישית ללקוח</div>
@@ -1703,6 +1719,25 @@ async function adminPostAnnouncement(){
   alert('✅ העדכון פורסם לכל הלקוחות');
   renderAdminAnnouncements();
 }
+async function checkTaxYearLock(){
+  const email = el('adm-lock-email').value.trim();
+  const year = el('adm-lock-year').value.trim();
+  const status = el('adm-lock-status');
+  if(!email||!year){ status.textContent='נא למלא אימייל ושנה'; return; }
+  const {data, error} = await sb.from('tax_year_status').select('locked,locked_at,completed_notified_at').eq('client_email',email).eq('tax_year',year).maybeSingle();
+  if(error){ status.textContent='שגיאה: '+error.message; return; }
+  if(!data){ status.textContent='🔓 פתוח (לא ננעל מעולם)'; return; }
+  status.textContent = data.locked ? `🔒 נעול (מאז ${new Date(data.locked_at).toLocaleString('he-IL')})` : '🔓 פתוח';
+  if(data.completed_notified_at) status.textContent += ' · ✓ הלקוח השלים את השאלון';
+}
+async function setTaxYearLock(locked){
+  const email = el('adm-lock-email').value.trim();
+  const year = el('adm-lock-year').value.trim();
+  if(!email||!year){ alert('נא למלא אימייל ושנה'); return; }
+  const {error} = await sb.rpc('lock_tax_year', {p_email:email, p_year:year, p_locked:locked});
+  if(error){ alert('שגיאה: '+error.message); return; }
+  await checkTaxYearLock();
+}
 async function renderAdminAnnouncements(){
   const list=document.getElementById('adm-ann-list'); if(!list||!sb) return;
   const {data} = await sb.from('portal_announcements').select('*').order('created_at',{ascending:false}).limit(10);
@@ -2344,7 +2379,7 @@ let loadUserDataRetryCount = 0;
 let clientName='', accounts=[], bankRows=[], records=[], uploadHistory=[], userLogoCache=null, recurringItems=[];
 let pendingSaveCount = 0; // protects against refreshing/closing mid-save (see saveUserData)
 window.addEventListener('beforeunload', (e)=>{
-  if(pendingSaveCount > 0){ e.preventDefault(); e.returnValue = ''; }
+  if(pendingSaveCount > 0 || taxAnswersDirty){ e.preventDefault(); e.returnValue = ''; }
 });
 let recurringType='הוצאה', recurringBP='biz';
 let dashAcct='all', dashView='all', dashPeriod='week', recAcct='all', cfPeriod='week';
@@ -2735,57 +2770,84 @@ const TAX_SECTIONS = [
 ];
 let taxAnswers = {}; // section_key -> {has_income, details}
 let pendingUploadSection = null;
+let currentYearLocked = false;
+let taxAnswersDirty = false; // tracks unsaved local changes, for the save button + leave-warning
 
 async function loadQuestionnaire(){
   if(!sb || !currentUser || !currentTaxYear) return;
   el('quest-year-label').textContent = currentTaxYear;
-  const {data, error} = await sb.from('tax_questionnaire').select('*')
-    .eq('client_email', currentUser.email).eq('tax_year', currentTaxYear);
+  const [{data, error}, {data:statusRow}] = await Promise.all([
+    sb.from('tax_questionnaire').select('*').eq('client_email', currentUser.email).eq('tax_year', currentTaxYear),
+    sb.from('tax_year_status').select('locked').eq('client_email', currentUser.email).eq('tax_year', currentTaxYear).maybeSingle()
+  ]);
   taxAnswers = {};
   if(!error && data) data.forEach(row=>{ taxAnswers[row.section_key] = {has_income:row.has_income, details:row.details||{}}; });
+  currentYearLocked = !!(statusRow && statusRow.locked);
+  taxAnswersDirty = false;
   renderQuestionnaire();
 }
 function renderQuestionnaire(){
   const wrap = el('questionnaire-body'); if(!wrap) return;
-  wrap.innerHTML = TAX_SECTIONS.map(s=>{
+  const lockBanner = currentYearLocked
+    ? `<div style="background:#f59e0b15;border:1px solid #f59e0b40;border-radius:8px;padding:10px 12px;margin-bottom:10px;font-size:12px;color:var(--yellow)">🔒 השנה הזו נעולה לעריכה — המשרד כבר בדק את השאלון. לשינויים, פנה למשרד.</div>`
+    : '';
+  wrap.innerHTML = lockBanner + TAX_SECTIONS.map(s=>{
     const ans = taxAnswers[s.key] || {has_income:null, details:{}};
     const yes = ans.has_income === true, no = ans.has_income === false;
+    const dis = currentYearLocked ? 'disabled style="opacity:.6"' : '';
     return `<div class="card2" style="margin-bottom:8px">
       <div style="display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap">
         <div style="font-weight:600;font-size:13px">${s.icon} ${s.q}</div>
         <div class="type-toggle no-print">
-          <button class="type-btn in${yes?' active':''}" onclick="setTaxAnswer('${s.key}',true)">כן</button>
-          <button class="type-btn out${no?' active':''}" onclick="setTaxAnswer('${s.key}',false)">לא</button>
+          <button class="type-btn in${yes?' active':''}" ${dis} onclick="setTaxAnswer('${s.key}',true)">כן</button>
+          <button class="type-btn out${no?' active':''}" ${dis} onclick="setTaxAnswer('${s.key}',false)">לא</button>
         </div>
       </div>
       ${yes ? `<div style="margin-top:8px;padding-top:8px;border-top:1px solid var(--border)">
         ${s.fields.map(f=>`<div style="margin-bottom:6px"><div class="form-label">${f.label}</div>
-          <input type="${f.type}" placeholder="${f.placeholder||''}" value="${(ans.details&&ans.details[f.id])||''}"
+          <input type="${f.type}" placeholder="${f.placeholder||''}" value="${(ans.details&&ans.details[f.id])||''}" ${dis}
             onchange="setTaxDetail('${s.key}','${f.id}',this.value)"></div>`).join("")}
         ${s.hint?`<div style="font-size:11px;color:var(--muted);margin-bottom:6px">💡 ${s.hint}</div>`:""}
-        <button class="btn btn-sm no-print" onclick="startSectionUpload('${s.key}')">📎 צרף קובץ לסעיף זה</button>
+        <button class="btn btn-sm no-print" ${dis} onclick="startSectionUpload('${s.key}')">📎 צרף קובץ לסעיף זה</button>
       </div>` : ""}
     </div>`;
-  }).join("");
+  }).join("") + (currentYearLocked ? '' : `
+    <button class="btn-solid no-print" id="quest-save-btn" onclick="saveQuestionnaire()" style="width:100%;margin-top:6px">💾 שמור שאלון</button>
+    <div id="quest-save-status" style="font-size:11px;color:var(--muted);text-align:center;margin-top:5px"></div>`);
 }
-async function setTaxAnswer(key, val){
+function setTaxAnswer(key, val){
   taxAnswers[key] = taxAnswers[key] || {details:{}};
   taxAnswers[key].has_income = val;
+  taxAnswersDirty = true;
   renderQuestionnaire();
-  await saveTaxAnswer(key);
 }
-async function setTaxDetail(key, fieldId, val){
+function setTaxDetail(key, fieldId, val){
   taxAnswers[key] = taxAnswers[key] || {has_income:true, details:{}};
   taxAnswers[key].details[fieldId] = val;
-  await saveTaxAnswer(key);
+  taxAnswersDirty = true;
 }
-async function saveTaxAnswer(key){
+async function saveQuestionnaire(){
   if(!sb || !currentUser || !currentTaxYear) return;
-  const ans = taxAnswers[key] || {has_income:null, details:{}};
-  await sb.from('tax_questionnaire').upsert({
-    client_email: currentUser.email, tax_year: currentTaxYear, section_key: key,
-    has_income: ans.has_income, details: ans.details||{}
-  }, {onConflict:'client_email,tax_year,section_key'});
+  const btn = el('quest-save-btn'); const status = el('quest-save-status');
+  if(btn){ btn.disabled = true; btn.textContent = 'שומר...'; }
+  const rows = TAX_SECTIONS.map(s=>{
+    const ans = taxAnswers[s.key] || {has_income:null, details:{}};
+    return { client_email: currentUser.email, tax_year: currentTaxYear, section_key: s.key,
+      has_income: ans.has_income===undefined?null:ans.has_income, details: ans.details||{} };
+  });
+  const {error} = await sb.from('tax_questionnaire').upsert(rows, {onConflict:'client_email,tax_year,section_key'});
+  taxAnswersDirty = false;
+  if(btn){ btn.disabled = false; btn.textContent = '💾 שמור שאלון'; }
+  if(error){ if(status) status.textContent = 'שגיאה בשמירה, נסה שוב.'; return; }
+  if(status){ status.textContent = '✓ נשמר'; setTimeout(()=>{ if(status) status.textContent=''; }, 2500); }
+  // If every section now has a real answer, notify the office this client
+  // finished — the RPC itself guards against notifying more than once.
+  const allAnswered = TAX_SECTIONS.every(s=>{
+    const a = taxAnswers[s.key]; return a && (a.has_income===true || a.has_income===false);
+  });
+  if(allAnswered){
+    sb.rpc('notify_questionnaire_complete', {p_email:currentUser.email, p_year:currentTaxYear}).catch(e=>console.error('notify error',e));
+  }
 }
 function startSectionUpload(key){
   pendingUploadSection = key;
