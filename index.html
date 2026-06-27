@@ -454,6 +454,9 @@ h2{font-size:16px;font-weight:800;margin-bottom:4px}
       <button class="side-btn" onclick="switchPortalTab('cashflow',this)"><span class="side-icon">💹</span> תזרים מזומנים</button>
       <button class="side-btn" onclick="switchPortalTab('recurring',this)"><span class="side-icon">🔁</span> הכנסות/הוצאות קבועות</button>
       <button class="side-btn" onclick="switchPortalTab('loans',this)"><span class="side-icon">🏦</span> הלוואות</button>
+      <button class="side-btn" onclick="switchPortalTab('files',this)"><span class="side-icon">📁</span> קבצים ומסמכים</button>
+      <button class="side-btn" onclick="switchPortalTab('taxdocs',this)"><span class="side-icon">📁</span> מסמכי מס</button>
+      <button class="side-btn" id="files-sb-btn" onclick="switchPortalTab('files',this)"><span class="side-icon">📁</span> קבצים</button>
       <div class="sidebar-section" id="admin-sb-section" style="display:none">ניהול מנהל</div>
       <button class="side-btn" id="admin-sb-btn" style="display:none" onclick="switchPortalTab('admin',this)"><span class="side-icon">👑</span> פאנל מנהל <span class="side-badge" id="admin-badge-count" style="display:none">0</span></button>
       <div class="sidebar-section">מידע</div>
@@ -1109,6 +1112,33 @@ h2{font-size:16px;font-weight:800;margin-bottom:4px}
         </div>
       </div>
 
+      <!-- FILES TAB -->
+      <div id="ptab-files" class="portal-tab">
+        <h2>📁 קבצים</h2>
+        <p class="subtitle">תיקיות לפי שנת מס — קבלות, טופס 106, אישורי גמל/פנסיה ומסמכים נוספים</p>
+
+        <div id="files-year-view">
+          <div class="card no-print">
+            <div class="sec-title">תיקיות (שנות מס)</div>
+            <div style="display:flex;gap:8px;margin-bottom:10px">
+              <input id="new-tax-year" type="number" placeholder="2026" style="max-width:120px">
+              <button class="btn-solid" onclick="createTaxYearFolder()" style="white-space:nowrap">+ תיקייה חדשה</button>
+            </div>
+          </div>
+          <div id="tax-years-list"><div class="card" style="text-align:center;color:var(--muted);padding:24px">טוען...</div></div>
+        </div>
+
+        <div id="files-inside-year" style="display:none">
+          <button class="btn btn-sm no-print" onclick="closeTaxYearFolder()" style="margin-bottom:10px">→ חזרה לתיקיות</button>
+          <div class="card no-print">
+            <div class="sec-title">תיקייה: שנת מס <span id="current-tax-year-label" style="color:var(--accent)"></span></div>
+            <input type="file" id="tax-file-input" style="display:none" onchange="uploadTaxFile(this.files[0])">
+            <button class="btn-solid" onclick="document.getElementById('tax-file-input').click()" style="width:100%">📤 העלה קובץ</button>
+          </div>
+          <div id="tax-files-list"><div class="card" style="text-align:center;color:var(--muted);padding:24px">טוען...</div></div>
+        </div>
+      </div>
+
       <!-- COMING SOON TABS -->
       <div id="ptab-pl" class="portal-tab"><div class="coming-soon"><div class="coming-soon-icon">📊</div><h3>דוח דוחות שנתיים</h3><p>מודול זה יאפשר לך לייצר דוח דוחות שנתיים מפורט.</p><div class="coming-soon-badge">🚀 בקרוב</div></div></div>
       <div id="ptab-balance" class="portal-tab"><div class="coming-soon"><div class="coming-soon-icon">⚖️</div><h3>מאזן</h3><p>סקירת נכסים, התחייבויות והון עצמי של העסק.</p><div class="coming-soon-badge">🚀 בקרוב</div></div></div>
@@ -1384,6 +1414,7 @@ async function enterPortal(){
     document.getElementById('plans-sb-btn').style.display='none';
     document.getElementById('referral-sb-btn').style.display='none';
     document.getElementById('ai-assistant-card').style.display='none';
+    document.getElementById('files-sb-btn').style.display='none';
   }
   const imgEl = document.getElementById('portal-logo-img');
   if(imgEl) imgEl.src = document.getElementById('print-logo').src;
@@ -1509,6 +1540,7 @@ function switchPortalTab(name,btn){
   if(name==='admin'){ refreshUsersCache().then(renderAdminPanel); renderAdminAnnouncements(); renderAdminReferrals(); renderAdminChatList(); }
   if(name==='plans') renderPlansTab();
   if(name==='referral') renderReferralTab();
+  if(name==='files'){ currentTaxYear=null; el('files-inside-year').style.display='none'; el('files-year-view').style.display='block'; loadTaxYears(); }
 }
 
 // ── LEGAL ──
@@ -2564,6 +2596,94 @@ function openLoanSchedule(id){
   el("loan-schedule-modal").classList.add("open");
 }
 function closeLoanSchedule(){ el("loan-schedule-modal").classList.remove("open"); }
+
+// ── TAX DOCUMENT FILES (Stage A: folders by tax year via Supabase Storage) ──
+let currentTaxYear = null;
+const TAX_BUCKET = 'tax-documents';
+function taxBasePath(){ return currentUser ? currentUser.email : ''; }
+async function loadTaxYears(){
+  const wrap = el('tax-years-list'); if(!wrap || !sb || !currentUser) return;
+  const {data, error} = await sb.storage.from(TAX_BUCKET).list(taxBasePath());
+  if(error){ wrap.innerHTML = `<div class="card" style="color:var(--red)">שגיאה בטעינת התיקיות: ${error.message}</div>`; return; }
+  const years = (data||[]).filter(d=>d.id===null).map(d=>d.name).sort((a,b)=>b-a);
+  if(!years.length){ wrap.innerHTML = '<div class="card" style="text-align:center;color:var(--muted);padding:24px">אין תיקיות עדיין — הוסף שנת מס</div>'; return; }
+  wrap.innerHTML = years.map(y=>`<div class="card" style="display:flex;justify-content:space-between;align-items:center;cursor:pointer" onclick="openTaxYearFolder('${y}')">
+    <div style="display:flex;align-items:center;gap:10px"><span style="font-size:22px">📁</span><span style="font-weight:700">שנת מס ${y}</span></div>
+    <button class="btn btn-red btn-sm no-print" onclick="event.stopPropagation();deleteTaxYearFolder('${y}')">מחק תיקייה</button>
+  </div>`).join("");
+}
+async function createTaxYearFolder(){
+  const year = el('new-tax-year').value.trim();
+  if(!year || !/^\d{4}$/.test(year)){ alert('נא להזין שנה תקינה (לדוגמה 2026)'); return; }
+  if(!sb || !currentUser) return;
+  // Storage has no real empty folders — a hidden placeholder makes the year
+  // show up in the list immediately, even before any real document is added.
+  const {error} = await sb.storage.from(TAX_BUCKET).upload(`${taxBasePath()}/${year}/.placeholder`, new Blob(['']), {upsert:true});
+  if(error){ alert('שגיאה: '+error.message); return; }
+  el('new-tax-year').value='';
+  loadTaxYears();
+}
+async function deleteTaxYearFolder(year){
+  if(!confirm(`למחוק את כל התיקייה של שנת ${year}? פעולה זו תמחק את כל הקבצים שבתוכה!`)) return;
+  const {data} = await sb.storage.from(TAX_BUCKET).list(`${taxBasePath()}/${year}`);
+  const paths = (data||[]).map(f=>`${taxBasePath()}/${year}/${f.name}`);
+  if(paths.length) await sb.storage.from(TAX_BUCKET).remove(paths);
+  loadTaxYears();
+}
+function openTaxYearFolder(year){
+  currentTaxYear = year;
+  el('current-tax-year-label').textContent = year;
+  el('files-year-view').style.display = 'none';
+  el('files-inside-year').style.display = 'block';
+  loadTaxFiles();
+}
+function closeTaxYearFolder(){
+  currentTaxYear = null;
+  el('files-inside-year').style.display = 'none';
+  el('files-year-view').style.display = 'block';
+  loadTaxYears();
+}
+async function loadTaxFiles(){
+  const wrap = el('tax-files-list'); if(!wrap || !currentTaxYear) return;
+  const {data, error} = await sb.storage.from(TAX_BUCKET).list(`${taxBasePath()}/${currentTaxYear}`);
+  if(error){ wrap.innerHTML = `<div class="card" style="color:var(--red)">שגיאה: ${error.message}</div>`; return; }
+  const files = (data||[]).filter(f=>f.name!=='.placeholder');
+  if(!files.length){ wrap.innerHTML = '<div class="card" style="text-align:center;color:var(--muted);padding:24px">אין קבצים בתיקייה זו עדיין</div>'; return; }
+  wrap.innerHTML = files.map(f=>{
+    const sizeKb = f.metadata?.size ? Math.round(f.metadata.size/1024) : '?';
+    return `<div class="card2" style="display:flex;justify-content:space-between;align-items:center">
+      <div style="display:flex;align-items:center;gap:8px;overflow:hidden">
+        <span style="font-size:18px">📄</span>
+        <div><div style="font-weight:600;font-size:12px">${f.name}</div><div style="font-size:10px;color:var(--muted)">${sizeKb} KB</div></div>
+      </div>
+      <div style="display:flex;gap:6px;flex-shrink:0">
+        <button class="btn btn-sm" onclick="downloadTaxFile('${f.name}')">⬇️</button>
+        <button class="btn btn-red btn-sm no-print" onclick="deleteTaxFile('${f.name}')">מחק</button>
+      </div>
+    </div>`;
+  }).join("");
+}
+async function uploadTaxFile(file){
+  if(!file || !currentTaxYear) return;
+  const path = `${taxBasePath()}/${currentTaxYear}/${file.name}`;
+  const {error} = await sb.storage.from(TAX_BUCKET).upload(path, file, {upsert:true});
+  el('tax-file-input').value = '';
+  if(error){ alert('שגיאה בהעלאה: '+error.message); return; }
+  loadTaxFiles();
+}
+async function downloadTaxFile(name){
+  const path = `${taxBasePath()}/${currentTaxYear}/${name}`;
+  const {data, error} = await sb.storage.from(TAX_BUCKET).createSignedUrl(path, 60);
+  if(error){ alert('שגיאה: '+error.message); return; }
+  window.open(data.signedUrl, '_blank');
+}
+async function deleteTaxFile(name){
+  if(!confirm(`למחוק את "${name}"?`)) return;
+  const path = `${taxBasePath()}/${currentTaxYear}/${name}`;
+  const {error} = await sb.storage.from(TAX_BUCKET).remove([path]);
+  if(error){ alert('שגיאה: '+error.message); return; }
+  loadTaxFiles();
+}
 
 // ── ACCOUNTS ──
 function addAccount(){
