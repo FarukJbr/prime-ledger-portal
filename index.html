@@ -2306,7 +2306,7 @@ async function saveUserData(){
     // happens to land mid-sync anyway (e.g. a slow connection), this lets the
     // next load recognize a suspiciously-empty server read and retry rather
     // than trusting it immediately.
-    try{ localStorage.setItem('pl_backup_'+email, JSON.stringify({accounts,bankRows,records,savedAt:Date.now()})); }catch(e){}
+    writeLocalBackup();
     // portal_recurring_items is intentionally NOT part of this sync — see
     // addRecurringItem/deleteRecurringItem/toggleRecurringActive, which use
     // direct targeted calls instead, to avoid clobbering next_due_date values
@@ -2353,18 +2353,29 @@ async function loadUserData(){
 
     // Defense in depth alongside the atomic sync RPC: if the server read
     // looks suspiciously emptier than what was known moments ago (e.g. a slow
-    // connection still mid-save), wait briefly and try once more before
-    // trusting it — rather than the user seeing their own data appear to
-    // vanish on refresh when nothing was actually lost server-side.
+    // connection still mid-save, or the page was reloaded before an add even
+    // reached the network), wait briefly and retry — and if it's STILL
+    // incomplete after retrying, trust the local backup instead and push it
+    // back up to the server, rather than silently accepting data loss.
     try{
       const backupRaw = localStorage.getItem('pl_backup_'+email);
-      if(backupRaw && loadUserDataRetryCount < 2){
+      if(backupRaw){
         const backup = JSON.parse(backupRaw);
+        const fresh = (Date.now()-(backup.savedAt||0)) < 60000;
         const looksIncomplete = accounts.length < (backup.accounts||[]).length || records.length < (backup.records||[]).length || bankRows.length < (backup.bankRows||[]).length;
-        if(looksIncomplete && (Date.now()-(backup.savedAt||0)) < 60000){
-          loadUserDataRetryCount++;
-          await new Promise(r=>setTimeout(r,1200));
-          return loadUserData();
+        if(looksIncomplete && fresh){
+          if(loadUserDataRetryCount < 2){
+            loadUserDataRetryCount++;
+            await new Promise(r=>setTimeout(r,1200));
+            return loadUserData();
+          }
+          // Retries exhausted and the server still looks behind the last
+          // known local state — adopt the local backup as truth and re-push
+          // it, instead of letting the user see their own recent work as gone.
+          accounts = backup.accounts||accounts;
+          bankRows = backup.bankRows||bankRows;
+          records = backup.records||records;
+          save();
         }
       }
       loadUserDataRetryCount = 0;
@@ -2378,6 +2389,15 @@ let loadUserDataRetryCount = 0;
 
 let clientName='', accounts=[], bankRows=[], records=[], uploadHistory=[], userLogoCache=null, recurringItems=[];
 let pendingSaveCount = 0; // protects against refreshing/closing mid-save (see saveUserData)
+function writeLocalBackup(){
+  // Snapshots the current in-memory state to localStorage. Called BOTH right
+  // after a successful server save AND optimistically the instant something
+  // is added locally (before the network call even starts) — so if the page
+  // gets reloaded before that network call finishes, loadUserData() still has
+  // something more recent than the server to recover from and re-push.
+  if(!currentUser) return;
+  try{ localStorage.setItem('pl_backup_'+currentUser.email, JSON.stringify({accounts,bankRows,records,savedAt:Date.now()})); }catch(e){}
+}
 window.addEventListener('beforeunload', (e)=>{
   if(pendingSaveCount > 0 || taxAnswersDirty){ e.preventDefault(); e.returnValue = ''; }
 });
@@ -2864,6 +2884,7 @@ async function addAccount(){
   const name=el("acct-name").value.trim(); if(!name){alert("נא להזין שם");return;}
   accounts.push({id:"acct-"+Date.now(),name,type:el("acct-type").value,opening:parseFloat(el("acct-opening").value)||0,limit:parseFloat(el("acct-limit").value)||0,color:COLORS[accounts.length%COLORS.length]});
   el("acct-name").value=""; el("acct-opening").value=""; el("acct-limit").value="";
+  writeLocalBackup(); // optimistic — survives a refresh even if the save below hasn't reached the network yet
   refreshAll(); // show it locally right away
   // Wait for the actual server round-trip before letting the save-tracking
   // counter (and therefore the leave-page warning) clear — refreshing before
@@ -2999,6 +3020,7 @@ async function addRecord(){
   if(similar&&!confirm(`💡 רישום דומה קיים:\n"${similar.description}"\nסכום: ${fmt(similar.amount)}\nתאריך: ${similar.date}\n\nהאם להוסיף בכל זאת?`)) return;
   records.push({id:"r-"+Date.now(),date:el("r-date").value||new Date().toISOString().slice(0,10),description:desc,amount,type:recordType,bp:recordBP,category:el("r-cat").value,acctId:el("r-acct").value||null,matched:false});
   el("r-desc").value=""; el("r-amount").value="";
+  writeLocalBackup(); // optimistic — survives a refresh even if the save below hasn't reached the network yet
   refreshAll();
   const btn = el('add-record-btn');
   if(btn){ btn.disabled = true; btn.textContent = 'שומר...'; }
