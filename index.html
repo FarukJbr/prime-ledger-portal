@@ -445,7 +445,7 @@ h2{font-size:16px;font-weight:800;margin-bottom:4px}
         <div id="portal-user-biz" style="font-size:10px;color:var(--muted)"></div>
       </div>
       <button class="portal-logout-btn no-print" onclick="doLogout()">יציאה</button>
-      <div class="no-print" style="font-size:9px;color:var(--muted);margin-right:6px;align-self:center">v2026-06-27-d</div>
+      <div class="no-print" style="font-size:9px;color:var(--muted);margin-right:6px;align-self:center">v2026-06-27-DEBUG2</div>
     </div>
   </div>
   <div id="portal-body">
@@ -2360,10 +2360,10 @@ async function loadUserData(){
       if(!dbg){
         dbg = document.createElement('div');
         dbg.id = 'debug-fetch-panel';
-        dbg.style = 'position:fixed;bottom:0;left:0;right:0;background:#000;color:#0f0;font-size:10px;padding:6px;z-index:99999;direction:ltr;text-align:left;font-family:monospace';
+        dbg.style = 'position:fixed;top:0;left:0;right:0;background:#ff0000;color:#fff;font-size:14px;font-weight:900;padding:10px;z-index:999999;direction:ltr;text-align:center;font-family:monospace;border-bottom:4px solid yellow';
         document.body.appendChild(dbg);
       }
-      dbg.textContent = `[loadUserData ${new Date().toLocaleTimeString()}] accounts=${accounts.length} records=${records.length} bankRows=${bankRows.length} email=${email}`;
+      dbg.textContent = `DEBUG: accounts=${accounts.length} records=${records.length} bankRows=${bankRows.length} @ ${new Date().toLocaleTimeString()}`;
     }catch(e){}
 
     // Defense in depth alongside the atomic sync RPC: if the server read
