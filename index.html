@@ -2712,12 +2712,12 @@ async function deleteTaxYearFolder(year){
   if(paths.length) await sb.storage.from(TAX_BUCKET).remove(paths);
   loadTaxYears();
 }
-function openTaxYearFolder(year){
+async function openTaxYearFolder(year){
   currentTaxYear = year;
   el('current-tax-year-label').textContent = year;
   el('files-year-view').style.display = 'none';
   el('files-inside-year').style.display = 'block';
-  loadTaxFiles();
+  await loadTaxFiles(); // must resolve first so currentTaxFiles is ready for the missing-upload check below
   loadQuestionnaire();
 }
 function closeTaxYearFolder(){
@@ -2726,11 +2726,13 @@ function closeTaxYearFolder(){
   el('files-year-view').style.display = 'block';
   loadTaxYears();
 }
+let currentTaxFiles = []; // populated by loadTaxFiles, read by renderQuestionnaire for the missing-upload warning
 async function loadTaxFiles(){
   const wrap = el('tax-files-list'); if(!wrap || !currentTaxYear) return;
   const {data, error} = await sb.storage.from(TAX_BUCKET).list(`${taxBasePath()}/${currentTaxYear}`);
   if(error){ wrap.innerHTML = `<div class="card" style="color:var(--red)">שגיאה: ${error.message}</div>`; return; }
   const files = (data||[]).filter(f=>f.name!=='.placeholder');
+  currentTaxFiles = files;
   if(!files.length){ wrap.innerHTML = '<div class="card" style="text-align:center;color:var(--muted);padding:24px">אין קבצים בתיקייה זו עדיין</div>'; return; }
   wrap.innerHTML = files.map(f=>{
     const sizeKb = f.metadata?.size ? Math.round(f.metadata.size/1024) : '?';
@@ -2762,7 +2764,8 @@ async function uploadTaxFile(file){
   const {error} = await sb.storage.from(TAX_BUCKET).upload(path, file, {upsert:true});
   el('tax-file-input').value = '';
   if(error){ alert('שגיאה בהעלאה: '+error.message); return; }
-  loadTaxFiles();
+  await loadTaxFiles();
+  renderQuestionnaire(); // clears the "missing document" warning for this section, if any
 }
 async function downloadTaxFile(name){
   const path = `${taxBasePath()}/${currentTaxYear}/${name}`;
@@ -2775,7 +2778,8 @@ async function deleteTaxFile(name){
   const path = `${taxBasePath()}/${currentTaxYear}/${name}`;
   const {error} = await sb.storage.from(TAX_BUCKET).remove([path]);
   if(error){ alert('שגיאה: '+error.message); return; }
-  loadTaxFiles();
+  await loadTaxFiles();
+  renderQuestionnaire();
 }
 
 // ── TAX QUESTIONNAIRE (mirrors the real appendices of טופס 1301) ──
@@ -2783,25 +2787,49 @@ async function deleteTaxFile(name){
 // when the answer is "yes". File uploads from here go into the same
 // tax-document Storage folder as the general file list (just reuses
 // uploadTaxFile under the hood) so everything for the year lives in one place.
+// requiresDoc: true → if answered "yes" with no matching uploaded file, show a
+// warning. spouseSupport: true → when married + "include spouse" is on, an
+// extra nested yes/no+fields block appears for the spouse, stored under
+// details.spouse so no schema change was needed.
 const TAX_SECTIONS = [
   {key:'salary', icon:'💼', q:'עבדת כשכיר השנה (קיבלת תלוש משכורת)?',
     fields:[{id:'employer_count', label:'ממספר מעסיקים?', type:'number', placeholder:'1'}],
-    hint:'יש לצרף טופס 106 מכל מעסיק.'},
+    hint:'יש לצרף טופס 106 מכל מעסיק.', requiresDoc:true, spouseSupport:true},
   {key:'business', icon:'🧾', q:'הייתה לך הכנסה מעסק עצמאי או משלח יד?',
-    fields:[], hint:'דוח רווח והפסד יופק מנתוני "תזרים מזומנים" בפורטל — אין צורך להעלות בנפרד, אלא אם יש הכנסה שלא עברה בפורטל.'},
+    fields:[], hint:'דוח רווח והפסד יופק מנתוני "תזרים מזומנים" בפורטל — אין צורך להעלות בנפרד, אלא אם יש הכנסה שלא עברה בפורטל.', requiresDoc:false, spouseSupport:true},
   {key:'property', icon:'🏠', q:'הייתה לך הכנסה משכר דירה או מנכס אחר?',
     fields:[{id:'property_count', label:'כמה נכסים?', type:'number', placeholder:'1'},{id:'monthly_rent', label:'שכ"ד חודשי משוער (₪)', type:'number', placeholder:'0'}],
-    hint:'מומלץ לצרף חוזה שכירות וקבלות.'},
-  {key:'pension', icon:'💰', q:'הפקדת לקופת גמל, קרן פנסיה או קרן השתלמות השנה?',
-    fields:[], hint:'יש לצרף אישורי הפקדה שנתיים.'},
+    hint:'מומלץ לצרף חוזה שכירות וקבלות.', requiresDoc:false, spouseSupport:true},
+  {key:'pension_contribution', icon:'💰', q:'הפקדת לקופת גמל, קרן פנסיה או קרן השתלמות השנה?',
+    fields:[], hint:'יש לצרף אישורי הפקדה שנתיים.', requiresDoc:true, spouseSupport:true},
+  {key:'pension_withdrawal', icon:'🏦', q:'משכת כספים מקופת גמל, פנסיה או קרן השתלמות השנה?',
+    fields:[{id:'amount', label:'סכום משוער (₪)', type:'number', placeholder:'0'}],
+    hint:'יש לצרף אישור משיכה מהקופה.', requiresDoc:true, spouseSupport:true},
+  {key:'interest_income', icon:'📊', q:'הייתה לך הכנסה מריבית (בנק או ניירות ערך)?',
+    fields:[], hint:'יש לצרף טופס 867 מהבנק או מבית ההשקעות.', requiresDoc:true, spouseSupport:true},
+  {key:'securities_gains', icon:'📈', q:'מכרת ניירות ערך (מניות/אג"ח/קרנות) ברווח השנה?',
+    fields:[], hint:'יש לצרף טופס 867 מהבנק או מבית ההשקעות.', requiresDoc:true, spouseSupport:true},
+  {key:'unemployment', icon:'📋', q:'קיבלת דמי אבטלה מהביטוח הלאומי השנה?',
+    fields:[{id:'amount', label:'סכום כולל משוער (₪)', type:'number', placeholder:'0'}],
+    hint:'יש לצרף אישור מהביטוח הלאומי.', requiresDoc:true, spouseSupport:true},
+  {key:'child_allowance', icon:'👶', q:'קיבלת קצבת ילדים מהביטוח הלאומי השנה?',
+    fields:[], hint:'בדרך כלל לא נדרש אישור נפרד — המידע מועבר ישירות מהביטוח הלאומי.', requiresDoc:false, spouseSupport:false},
   {key:'donations', icon:'🤝', q:'תרמת לעמותה מוכרת לפי סעיף 46?',
     fields:[{id:'amount', label:'סכום כולל משוער (₪)', type:'number', placeholder:'0'}],
-    hint:'יש לצרף קבלות מקוריות מהעמותה.'},
+    hint:'יש לצרף קבלות מקוריות מהעמותה.', requiresDoc:true, spouseSupport:true},
 ];
-let taxAnswers = {}; // section_key -> {has_income, details}
+let taxAnswers = {}; // section_key -> {has_income, details, spouse:{has_income,details}}
+let personalInfo = {maritalStatus:'', childrenCount:'', includeSpouse:false, spouseName:'', spouseId:'', taxWithheld:''};
 let pendingUploadSection = null;
 let currentYearLocked = false;
 let taxAnswersDirty = false; // tracks unsaved local changes, for the save button + leave-warning
+
+// Checks whether ANY uploaded file is tagged for this section (filename
+// prefix "key__..."), regardless of whether it was attached for the main
+// person or the spouse — used to drive the "no document attached" warning.
+function sectionHasUpload(key){
+  return currentTaxFiles.some(f=>f.name.startsWith(key+'__'));
+}
 
 async function loadQuestionnaire(){
   if(!sb || !currentUser || !currentTaxYear) return;
@@ -2811,20 +2839,62 @@ async function loadQuestionnaire(){
     sb.from('tax_year_status').select('locked').eq('client_email', currentUser.email).eq('tax_year', currentTaxYear).maybeSingle()
   ]);
   taxAnswers = {};
-  if(!error && data) data.forEach(row=>{ taxAnswers[row.section_key] = {has_income:row.has_income, details:row.details||{}}; });
+  personalInfo = {maritalStatus:'', childrenCount:'', includeSpouse:false, spouseName:'', spouseId:'', taxWithheld:''};
+  if(!error && data) data.forEach(row=>{
+    if(row.section_key === 'personal_info'){
+      personalInfo = {...personalInfo, ...(row.details||{})};
+    } else {
+      taxAnswers[row.section_key] = {has_income:row.has_income, details:row.details||{}};
+    }
+  });
   currentYearLocked = !!(statusRow && statusRow.locked);
   taxAnswersDirty = false;
   renderQuestionnaire();
 }
 function renderQuestionnaire(){
   const wrap = el('questionnaire-body'); if(!wrap) return;
+  const dis = currentYearLocked ? 'disabled style="opacity:.6"' : '';
   const lockBanner = currentYearLocked
     ? `<div style="background:#f59e0b15;border:1px solid #f59e0b40;border-radius:8px;padding:10px 12px;margin-bottom:10px;font-size:12px;color:var(--yellow)">🔒 השנה הזו נעולה לעריכה — המשרד כבר בדק את השאלון. לשינויים, פנה למשרד.</div>`
     : '';
-  wrap.innerHTML = lockBanner + TAX_SECTIONS.map(s=>{
+
+  const married = personalInfo.maritalStatus === 'married';
+  const personalBlock = `<div class="card2" style="margin-bottom:8px">
+    <div style="font-weight:600;font-size:13px;margin-bottom:8px">👤 מצב משפחתי</div>
+    <div class="form-grid" style="grid-template-columns:1fr 1fr">
+      <div><div class="form-label">מצב משפחתי</div>
+        <select ${dis} onchange="setPersonalInfo('maritalStatus',this.value)">
+          <option value="" ${!personalInfo.maritalStatus?'selected':''}>-- בחר --</option>
+          <option value="single" ${personalInfo.maritalStatus==='single'?'selected':''}>רווק/ה</option>
+          <option value="married" ${personalInfo.maritalStatus==='married'?'selected':''}>נשוי/אה</option>
+          <option value="divorced" ${personalInfo.maritalStatus==='divorced'?'selected':''}>גרוש/ה</option>
+          <option value="widowed" ${personalInfo.maritalStatus==='widowed'?'selected':''}>אלמן/ה</option>
+        </select></div>
+      <div><div class="form-label">מספר ילדים</div>
+        <input type="number" placeholder="0" value="${personalInfo.childrenCount||''}" ${dis} onchange="setPersonalInfo('childrenCount',this.value)"></div>
+    </div>
+    ${married ? `
+      <div style="margin-top:8px;padding-top:8px;border-top:1px solid var(--border)">
+        <label style="display:flex;align-items:center;gap:6px;font-size:12px;cursor:pointer">
+          <input type="checkbox" ${personalInfo.includeSpouse?'checked':''} ${dis} onchange="setPersonalInfo('includeSpouse',this.checked)">
+          כלול גם נתונים פיננסיים של בן/בת הזוג
+        </label>
+        ${personalInfo.includeSpouse ? `<div class="form-grid" style="grid-template-columns:1fr 1fr;margin-top:6px">
+          <div><div class="form-label">שם בן/בת הזוג</div><input type="text" value="${personalInfo.spouseName||''}" ${dis} onchange="setPersonalInfo('spouseName',this.value)"></div>
+          <div><div class="form-label">ת.ז. בן/בת הזוג</div><input type="text" value="${personalInfo.spouseId||''}" ${dis} onchange="setPersonalInfo('spouseId',this.value)"></div>
+        </div>` : ''}
+      </div>` : ''}
+  </div>`;
+
+  const showSpouse = married && personalInfo.includeSpouse;
+
+  const sectionsHtml = TAX_SECTIONS.map(s=>{
     const ans = taxAnswers[s.key] || {has_income:null, details:{}};
     const yes = ans.has_income === true, no = ans.has_income === false;
-    const dis = currentYearLocked ? 'disabled style="opacity:.6"' : '';
+    const missingDoc = yes && s.requiresDoc && !sectionHasUpload(s.key);
+    const spouseAns = (ans.spouse) || {has_income:null, details:{}};
+    const spouseYes = spouseAns.has_income === true, spouseNo = spouseAns.has_income === false;
+    const spouseMissingDoc = spouseYes && s.requiresDoc && !sectionHasUpload(s.key);
     return `<div class="card2" style="margin-bottom:8px">
       <div style="display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap">
         <div style="font-weight:600;font-size:13px">${s.icon} ${s.q}</div>
@@ -2839,11 +2909,40 @@ function renderQuestionnaire(){
             onchange="setTaxDetail('${s.key}','${f.id}',this.value)"></div>`).join("")}
         ${s.hint?`<div style="font-size:11px;color:var(--muted);margin-bottom:6px">💡 ${s.hint}</div>`:""}
         <button class="btn btn-sm no-print" ${dis} onclick="startSectionUpload('${s.key}')">📎 צרף קובץ לסעיף זה</button>
+        ${missingDoc?`<div style="font-size:11px;color:var(--red);margin-top:6px">⚠️ סומן "כן" אך לא צורף קובץ — מומלץ להעלות לפני שליחה.</div>`:""}
+      </div>` : ""}
+      ${(s.spouseSupport && showSpouse) ? `<div style="margin-top:8px;padding-top:8px;border-top:1px dashed var(--border)">
+        <div style="display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap">
+          <div style="font-size:12px;color:var(--muted)">👥 עבור בן/בת הזוג — אותה שאלה</div>
+          <div class="type-toggle no-print">
+            <button class="type-btn in${spouseYes?' active':''}" ${dis} onclick="setSpouseAnswer('${s.key}',true)">כן</button>
+            <button class="type-btn out${spouseNo?' active':''}" ${dis} onclick="setSpouseAnswer('${s.key}',false)">לא</button>
+          </div>
+        </div>
+        ${spouseYes ? `<div style="margin-top:6px">
+          ${s.fields.map(f=>`<div style="margin-bottom:6px"><div class="form-label">${f.label} (בן/בת הזוג)</div>
+            <input type="${f.type}" placeholder="${f.placeholder||''}" value="${(spouseAns.details&&spouseAns.details[f.id])||''}" ${dis}
+              onchange="setSpouseDetail('${s.key}','${f.id}',this.value)"></div>`).join("")}
+          <button class="btn btn-sm no-print" ${dis} onclick="startSectionUpload('${s.key}')">📎 צרף קובץ (לבן/בת הזוג)</button>
+          ${spouseMissingDoc?`<div style="font-size:11px;color:var(--red);margin-top:6px">⚠️ סומן "כן" אך לא צורף קובץ.</div>`:""}
+        </div>` : ""}
       </div>` : ""}
     </div>`;
-  }).join("") + (currentYearLocked ? '' : `
+  }).join("");
+
+  const taxWithheldBlock = `<div class="card2" style="margin-bottom:8px">
+    <div class="form-label">כמה מס שולם/נוכה במקור השנה (משוער, ₪)</div>
+    <input type="number" placeholder="0" value="${personalInfo.taxWithheld||''}" ${dis} onchange="setPersonalInfo('taxWithheld',this.value)">
+  </div>`;
+
+  wrap.innerHTML = lockBanner + personalBlock + sectionsHtml + taxWithheldBlock + (currentYearLocked ? '' : `
     <button class="btn-solid no-print" id="quest-save-btn" onclick="saveQuestionnaire()" style="width:100%;margin-top:6px">💾 שמור שאלון</button>
     <div id="quest-save-status" style="font-size:11px;color:var(--muted);text-align:center;margin-top:5px"></div>`);
+}
+function setPersonalInfo(field, val){
+  personalInfo[field] = val;
+  taxAnswersDirty = true;
+  renderQuestionnaire();
 }
 function setTaxAnswer(key, val){
   taxAnswers[key] = taxAnswers[key] || {details:{}};
@@ -2856,15 +2955,32 @@ function setTaxDetail(key, fieldId, val){
   taxAnswers[key].details[fieldId] = val;
   taxAnswersDirty = true;
 }
+function setSpouseAnswer(key, val){
+  taxAnswers[key] = taxAnswers[key] || {has_income:null, details:{}};
+  taxAnswers[key].spouse = taxAnswers[key].spouse || {details:{}};
+  taxAnswers[key].spouse.has_income = val;
+  taxAnswersDirty = true;
+  renderQuestionnaire();
+}
+function setSpouseDetail(key, fieldId, val){
+  taxAnswers[key] = taxAnswers[key] || {has_income:null, details:{}};
+  taxAnswers[key].spouse = taxAnswers[key].spouse || {has_income:true, details:{}};
+  taxAnswers[key].spouse.details[fieldId] = val;
+  taxAnswersDirty = true;
+}
 async function saveQuestionnaire(){
   if(!sb || !currentUser || !currentTaxYear) return;
   const btn = el('quest-save-btn'); const status = el('quest-save-status');
   if(btn){ btn.disabled = true; btn.textContent = 'שומר...'; }
   const rows = TAX_SECTIONS.map(s=>{
     const ans = taxAnswers[s.key] || {has_income:null, details:{}};
+    const details = {...(ans.details||{})};
+    if(ans.spouse) details.spouse = ans.spouse;
     return { client_email: currentUser.email, tax_year: currentTaxYear, section_key: s.key,
-      has_income: ans.has_income===undefined?null:ans.has_income, details: ans.details||{} };
+      has_income: ans.has_income===undefined?null:ans.has_income, details };
   });
+  rows.push({ client_email: currentUser.email, tax_year: currentTaxYear, section_key: 'personal_info',
+    has_income: null, details: personalInfo });
   const {error} = await sb.from('tax_questionnaire').upsert(rows, {onConflict:'client_email,tax_year,section_key'});
   taxAnswersDirty = false;
   if(btn){ btn.disabled = false; btn.textContent = '💾 שמור שאלון'; }
