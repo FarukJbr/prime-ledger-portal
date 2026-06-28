@@ -445,7 +445,7 @@ h2{font-size:16px;font-weight:800;margin-bottom:4px}
         <div id="portal-user-biz" style="font-size:10px;color:var(--muted)"></div>
       </div>
       <button class="portal-logout-btn no-print" onclick="doLogout()">יציאה</button>
-      <div class="no-print" style="font-size:9px;color:var(--muted);margin-right:6px;align-self:center">v2026-06-27-DEBUG3</div>
+      <div class="no-print" style="font-size:9px;color:var(--muted);margin-right:6px;align-self:center">v2026-06-27-ALERT4</div>
     </div>
   </div>
   <div id="portal-body">
@@ -2316,7 +2316,10 @@ async function saveUserData(){
   }catch(e){ console.error('saveUserData sync error', e); }
   finally{ pendingSaveCount = Math.max(0, pendingSaveCount-1); }
 }
+let loadUserDataCallCount = 0;
 async function loadUserData(){
+  loadUserDataCallCount++;
+  alert('DEBUG: loadUserData CALLED (call #'+loadUserDataCallCount+')');
   if(!sb || !currentUser){
     try{
       const d=JSON.parse(localStorage.getItem(getKey())||'null');
@@ -2355,16 +2358,7 @@ async function loadUserData(){
     // TEMPORARY DIAGNOSTIC — visible on-page so we can see exactly what the
     // server returned without needing dev tools. Safe to remove once the
     // disappearing-data issue is fully understood; harmless if left in.
-    try{
-      let dbg = document.getElementById('debug-fetch-panel');
-      if(!dbg){
-        dbg = document.createElement('div');
-        dbg.id = 'debug-fetch-panel';
-        dbg.style = 'background:#ff0000;color:#fff;font-size:14px;font-weight:900;padding:10px;direction:ltr;text-align:center;font-family:monospace;border-bottom:4px solid yellow';
-        document.body.insertBefore(dbg, document.body.firstChild);
-      }
-      dbg.textContent = `DEBUG: accounts=${accounts.length} records=${records.length} bankRows=${bankRows.length} @ ${new Date().toLocaleTimeString()}`;
-    }catch(e){}
+    alert(`DEBUG LOAD: accounts=${accounts.length} records=${records.length} bankRows=${bankRows.length}\nemail=${email}\ntime=${new Date().toLocaleTimeString()}`);
 
     // Defense in depth alongside the atomic sync RPC: if the server read
     // looks suspiciously emptier than what was known moments ago (e.g. a slow
@@ -2397,6 +2391,7 @@ async function loadUserData(){
     }catch(e){}
   }catch(e){
     console.error('loadUserData fetch error', e);
+    alert('DEBUG: loadUserData CRASHED: '+(e?.message||e));
     accounts=[]; bankRows=[]; records=[]; clientName=''; uploadHistory=[]; recurringItems=[]; loans=[];
   }
 }
