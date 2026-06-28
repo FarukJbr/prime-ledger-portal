@@ -2823,6 +2823,7 @@ let personalInfo = {maritalStatus:'', childrenCount:'', includeSpouse:false, spo
 let pendingUploadSection = null;
 let currentYearLocked = false;
 let taxAnswersDirty = false; // tracks unsaved local changes, for the save button + leave-warning
+let questionnaireSentAt = null; // set once the client has explicitly clicked "send to office" for this year
 
 // Checks whether ANY uploaded file is tagged for this section (filename
 // prefix "key__..."), regardless of whether it was attached for the main
@@ -2836,7 +2837,7 @@ async function loadQuestionnaire(){
   el('quest-year-label').textContent = currentTaxYear;
   const [{data, error}, {data:statusRow}] = await Promise.all([
     sb.from('tax_questionnaire').select('*').eq('client_email', currentUser.email).eq('tax_year', currentTaxYear),
-    sb.from('tax_year_status').select('locked').eq('client_email', currentUser.email).eq('tax_year', currentTaxYear).maybeSingle()
+    sb.from('tax_year_status').select('locked,completed_notified_at').eq('client_email', currentUser.email).eq('tax_year', currentTaxYear).maybeSingle()
   ]);
   taxAnswers = {};
   personalInfo = {maritalStatus:'', childrenCount:'', includeSpouse:false, spouseName:'', spouseId:'', taxWithheld:''};
@@ -2848,6 +2849,7 @@ async function loadQuestionnaire(){
     }
   });
   currentYearLocked = !!(statusRow && statusRow.locked);
+  questionnaireSentAt = statusRow?.completed_notified_at || null;
   taxAnswersDirty = false;
   renderQuestionnaire();
 }
@@ -2935,9 +2937,18 @@ function renderQuestionnaire(){
     <input type="number" placeholder="0" value="${personalInfo.taxWithheld||''}" ${dis} onchange="setPersonalInfo('taxWithheld',this.value)">
   </div>`;
 
-  wrap.innerHTML = lockBanner + personalBlock + sectionsHtml + taxWithheldBlock + (currentYearLocked ? '' : `
-    <button class="btn-solid no-print" id="quest-save-btn" onclick="saveQuestionnaire()" style="width:100%;margin-top:6px">💾 שמור שאלון</button>
-    <div id="quest-save-status" style="font-size:11px;color:var(--muted);text-align:center;margin-top:5px"></div>`);
+  const sentBanner = questionnaireSentAt
+    ? `<div style="background:#10b98115;border:1px solid #10b98140;border-radius:8px;padding:10px 12px;margin-bottom:10px;font-size:12px;color:var(--accent)">✅ נשלח למשרד בתאריך ${new Date(questionnaireSentAt).toLocaleDateString('he-IL')}. אפשר עדיין לעדכן ולשמור — המשרד יראה את העדכון בבדיקה.</div>`
+    : '';
+
+  const actionButtons = currentYearLocked ? '' : `
+    <div style="display:flex;gap:8px;margin-top:6px" class="no-print">
+      <button class="btn" id="quest-save-btn" onclick="saveQuestionnaire()" style="flex:1">💾 שמור</button>
+      <button class="btn-solid" id="quest-send-btn" onclick="sendToOffice()" style="flex:1">📤 שלח למשרד</button>
+    </div>
+    <div id="quest-save-status" style="font-size:11px;color:var(--muted);text-align:center;margin-top:5px"></div>`;
+
+  wrap.innerHTML = lockBanner + sentBanner + personalBlock + sectionsHtml + taxWithheldBlock + actionButtons;
 }
 function setPersonalInfo(field, val){
   personalInfo[field] = val;
@@ -2968,10 +2979,9 @@ function setSpouseDetail(key, fieldId, val){
   taxAnswers[key].spouse.details[fieldId] = val;
   taxAnswersDirty = true;
 }
-async function saveQuestionnaire(){
-  if(!sb || !currentUser || !currentTaxYear) return;
-  const btn = el('quest-save-btn'); const status = el('quest-save-status');
-  if(btn){ btn.disabled = true; btn.textContent = 'שומר...'; }
+// Shared persistence logic used by both buttons — just writes the current
+// local state to the DB, no side effects beyond that.
+async function persistQuestionnaire(){
   const rows = TAX_SECTIONS.map(s=>{
     const ans = taxAnswers[s.key] || {has_income:null, details:{}};
     const details = {...(ans.details||{})};
@@ -2981,19 +2991,52 @@ async function saveQuestionnaire(){
   });
   rows.push({ client_email: currentUser.email, tax_year: currentTaxYear, section_key: 'personal_info',
     has_income: null, details: personalInfo });
-  const {error} = await sb.from('tax_questionnaire').upsert(rows, {onConflict:'client_email,tax_year,section_key'});
+  return await sb.from('tax_questionnaire').upsert(rows, {onConflict:'client_email,tax_year,section_key'});
+}
+async function saveQuestionnaire(){
+  if(!sb || !currentUser || !currentTaxYear) return;
+  const btn = el('quest-save-btn'); const status = el('quest-save-status');
+  if(btn){ btn.disabled = true; }
+  const {error} = await persistQuestionnaire();
   taxAnswersDirty = false;
-  if(btn){ btn.disabled = false; btn.textContent = '💾 שמור שאלון'; }
+  if(btn){ btn.disabled = false; }
   if(error){ if(status) status.textContent = 'שגיאה בשמירה, נסה שוב.'; return; }
   if(status){ status.textContent = '✓ נשמר'; setTimeout(()=>{ if(status) status.textContent=''; }, 2500); }
-  // If every section now has a real answer, notify the office this client
-  // finished — the RPC itself guards against notifying more than once.
-  const allAnswered = TAX_SECTIONS.every(s=>{
-    const a = taxAnswers[s.key]; return a && (a.has_income===true || a.has_income===false);
+}
+async function sendToOffice(){
+  if(!sb || !currentUser || !currentTaxYear) return;
+  const status = el('quest-save-status');
+
+  const unanswered = TAX_SECTIONS.filter(s=>{
+    const a = taxAnswers[s.key]; return !a || (a.has_income!==true && a.has_income!==false);
   });
-  if(allAnswered){
-    sb.rpc('notify_questionnaire_complete', {p_email:currentUser.email, p_year:currentTaxYear}).catch(e=>console.error('notify error',e));
+  const missingDocs = TAX_SECTIONS.filter(s=>{
+    const a = taxAnswers[s.key];
+    return a && a.has_income===true && s.requiresDoc && !sectionHasUpload(s.key);
+  });
+
+  if(unanswered.length || missingDocs.length){
+    let msg = 'לפני השליחה, שים לב:\n';
+    if(unanswered.length) msg += `• ${unanswered.length} שאלות עדיין לא נענו (${unanswered.map(s=>s.q.slice(0,20)+'...').join(', ')})\n`;
+    if(missingDocs.length) msg += `• חסרים קבצים לסעיפים: ${missingDocs.map(s=>s.key).join(', ')}\n`;
+    msg += '\nלשלוח למשרד בכל זאת?';
+    if(!confirm(msg)) return;
   }
+
+  const sendBtn = el('quest-send-btn');
+  if(sendBtn){ sendBtn.disabled = true; sendBtn.textContent = 'שולח...'; }
+  const {error} = await persistQuestionnaire();
+  taxAnswersDirty = false;
+  if(error){
+    if(sendBtn){ sendBtn.disabled = false; sendBtn.textContent = '📤 שלח למשרד'; }
+    if(status) status.textContent = 'שגיאה בשמירה, נסה שוב.';
+    return;
+  }
+  const {data: notifyResult} = await sb.rpc('notify_questionnaire_complete', {p_email:currentUser.email, p_year:currentTaxYear});
+  questionnaireSentAt = new Date().toISOString();
+  if(sendBtn){ sendBtn.disabled = false; sendBtn.textContent = '📤 שלח למשרד'; }
+  if(status) status.textContent = '✅ נשלח למשרד בהצלחה';
+  renderQuestionnaire();
 }
 function startSectionUpload(key){
   pendingUploadSection = key;
