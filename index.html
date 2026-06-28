@@ -445,7 +445,7 @@ h2{font-size:16px;font-weight:800;margin-bottom:4px}
         <div id="portal-user-biz" style="font-size:10px;color:var(--muted)"></div>
       </div>
       <button class="portal-logout-btn no-print" onclick="doLogout()">יציאה</button>
-      <div class="no-print" style="font-size:9px;color:var(--muted);margin-right:6px;align-self:center">v2026-06-27-ALERT4</div>
+      <div class="no-print" style="font-size:9px;color:var(--muted);margin-right:6px;align-self:center">v2026-06-27-FIXED5</div>
     </div>
   </div>
   <div id="portal-body">
@@ -2319,7 +2319,6 @@ async function saveUserData(){
 let loadUserDataCallCount = 0;
 async function loadUserData(){
   loadUserDataCallCount++;
-  alert('DEBUG: loadUserData CALLED (call #'+loadUserDataCallCount+')');
   if(!sb || !currentUser){
     try{
       const d=JSON.parse(localStorage.getItem(getKey())||'null');
@@ -2334,9 +2333,16 @@ async function loadUserData(){
     // Catch up any due recurring items/loan payments immediately on login, in
     // addition to the daily server-side cron — so the user doesn't have to wait
     // until 5am to see a payment that's due today.
+    // NOTE: this previously used .catch() chained directly onto sb.rpc(...),
+    // which crashed with "is not a function" — sb.rpc() here apparently
+    // doesn't return a thenable with .catch attached. That crash was being
+    // swallowed by the outer try/catch around this whole function, which then
+    // reset accounts/records/etc. to empty arrays — meaning the actual cause
+    // of "everything disappears after refresh" was this exact crash on EVERY
+    // single load, not a real data-loss issue. Real try/catch fixes it.
     if(typeof sb.rpc === 'function'){
-      await sb.rpc('process_due_recurring_items').catch(e=>console.error('process_due_recurring_items error',e));
-      await sb.rpc('process_due_loan_payments').catch(e=>console.error('process_due_loan_payments error',e));
+      try{ await sb.rpc('process_due_recurring_items'); }catch(e){ console.error('process_due_recurring_items error',e); }
+      try{ await sb.rpc('process_due_loan_payments'); }catch(e){ console.error('process_due_loan_payments error',e); }
     }
     const [{data:accD},{data:bankD},{data:recD},{data:userD},{data:recurD},{data:loanD}] = await Promise.all([
       sb.from('portal_accounts').select('*').eq('client_email',email),
@@ -2354,11 +2360,6 @@ async function loadUserData(){
     userLogoCache = userD?.logo_data || null;
     recurringItems = (recurD||[]).map(r=>({id:r.id,name:r.name,type:r.type,amount:Number(r.amount)||0,frequency:r.frequency,dayOfMonth:r.day_of_month,nextDueDate:r.next_due_date,category:r.category,bp:r.bp,acctId:r.acct_id,active:r.active!==false}));
     loans = (loanD||[]).map(l=>({id:l.id,name:l.name,principal:Number(l.principal)||0,ratePercent:Number(l.rate_percent)||0,rateMode:l.rate_mode,termMonths:l.term_months,startDate:l.start_date,monthlyPayment:Number(l.monthly_payment)||0,bp:l.bp,acctId:l.acct_id,category:l.category,nextDueDate:l.next_due_date,paymentsMade:l.payments_made||0,active:l.active!==false}));
-
-    // TEMPORARY DIAGNOSTIC — visible on-page so we can see exactly what the
-    // server returned without needing dev tools. Safe to remove once the
-    // disappearing-data issue is fully understood; harmless if left in.
-    alert(`DEBUG LOAD: accounts=${accounts.length} records=${records.length} bankRows=${bankRows.length}\nemail=${email}\ntime=${new Date().toLocaleTimeString()}`);
 
     // Defense in depth alongside the atomic sync RPC: if the server read
     // looks suspiciously emptier than what was known moments ago (e.g. a slow
@@ -2391,7 +2392,6 @@ async function loadUserData(){
     }catch(e){}
   }catch(e){
     console.error('loadUserData fetch error', e);
-    alert('DEBUG: loadUserData CRASHED: '+(e?.message||e));
     accounts=[]; bankRows=[]; records=[]; clientName=''; uploadHistory=[]; recurringItems=[]; loans=[];
   }
 }
