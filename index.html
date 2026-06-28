@@ -445,7 +445,7 @@ h2{font-size:16px;font-weight:800;margin-bottom:4px}
         <div id="portal-user-biz" style="font-size:10px;color:var(--muted)"></div>
       </div>
       <button class="portal-logout-btn no-print" onclick="doLogout()">יציאה</button>
-      <div class="no-print" style="font-size:9px;color:var(--muted);margin-right:6px;align-self:center">v2026-06-27-DEBUG2</div>
+      <div class="no-print" style="font-size:9px;color:var(--muted);margin-right:6px;align-self:center">v2026-06-27-DEBUG3</div>
     </div>
   </div>
   <div id="portal-body">
@@ -477,9 +477,9 @@ h2{font-size:16px;font-weight:800;margin-bottom:4px}
           <div class="welcome-title" id="wc-title">שלום! 👋</div>
           <div class="welcome-sub" id="wc-sub">ברוך הבא לפורטל הפיננסי שלך</div>
           <div class="welcome-stats">
-            <div class="welcome-stat"><div class="welcome-stat-val" id="ws-bal">₪0</div><div class="welcome-stat-lbl">יתרה נוכחית</div></div>
-            <div class="welcome-stat"><div class="welcome-stat-val" id="ws-records" style="color:#3b82f6">0</div><div class="welcome-stat-lbl">רישומים</div></div>
-            <div class="welcome-stat"><div class="welcome-stat-val" id="ws-unmatched" style="color:var(--yellow)">0</div><div class="welcome-stat-lbl">לא מותאם</div></div>
+            <div class="welcome-stat"><div class="welcome-stat-val" id="ws-bal">...</div><div class="welcome-stat-lbl">יתרה נוכחית</div></div>
+            <div class="welcome-stat"><div class="welcome-stat-val" id="ws-records" style="color:#3b82f6">...</div><div class="welcome-stat-lbl">רישומים</div></div>
+            <div class="welcome-stat"><div class="welcome-stat-val" id="ws-unmatched" style="color:var(--yellow)">...</div><div class="welcome-stat-lbl">לא מותאם</div></div>
           </div>
         </div>
         <!-- FINANCIAL HEALTH SCORE -->
@@ -568,23 +568,23 @@ h2{font-size:16px;font-weight:800;margin-bottom:4px}
               <button class="itab priv" onclick="setDashView('priv',this)">🏠 פרטי</button>
             </div>
             <div class="kpi-grid">
-              <div class="kpi" style="border-top:3px solid #10b981"><div class="kpi-lbl">יתרה</div><div class="kpi-val" id="kpi-bal" style="color:#10b981">₪0</div><div class="kpi-sub" id="kpi-bal-sub"></div></div>
-              <div class="kpi" style="border-top:3px solid #10b981"><div class="kpi-lbl">הכנסות</div><div class="kpi-val" id="kpi-inc" style="color:#10b981">₪0</div></div>
-              <div class="kpi" style="border-top:3px solid #ef4444"><div class="kpi-lbl">הוצאות</div><div class="kpi-val" id="kpi-exp" style="color:#ef4444">₪0</div></div>
-              <div class="kpi" style="border-top:3px solid var(--yellow)"><div class="kpi-lbl">לא מותאם</div><div class="kpi-val" id="kpi-unm" style="color:var(--yellow)">0</div></div>
+              <div class="kpi" style="border-top:3px solid #10b981"><div class="kpi-lbl">יתרה</div><div class="kpi-val" id="kpi-bal" style="color:#10b981">...</div><div class="kpi-sub" id="kpi-bal-sub"></div></div>
+              <div class="kpi" style="border-top:3px solid #10b981"><div class="kpi-lbl">הכנסות</div><div class="kpi-val" id="kpi-inc" style="color:#10b981">...</div></div>
+              <div class="kpi" style="border-top:3px solid #ef4444"><div class="kpi-lbl">הוצאות</div><div class="kpi-val" id="kpi-exp" style="color:#ef4444">...</div></div>
+              <div class="kpi" style="border-top:3px solid var(--yellow)"><div class="kpi-lbl">לא מותאם</div><div class="kpi-val" id="kpi-unm" style="color:var(--yellow)">...</div></div>
             </div>
             <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px" id="dash-split-cards">
               <div class="card" id="dash-biz-card">
                 <div class="sec-title">עסקי 🏢</div>
-                <div style="display:flex;justify-content:space-between;margin-bottom:5px;font-size:13px"><span style="color:var(--muted)">הכנסות</span><span style="color:#10b981;font-weight:700" id="db-inc">₪0</span></div>
-                <div style="display:flex;justify-content:space-between;font-size:13px"><span style="color:var(--muted)">הוצאות</span><span style="color:#ef4444;font-weight:700" id="db-exp">₪0</span></div>
+                <div style="display:flex;justify-content:space-between;margin-bottom:5px;font-size:13px"><span style="color:var(--muted)">הכנסות</span><span style="color:#10b981;font-weight:700" id="db-inc">...</span></div>
+                <div style="display:flex;justify-content:space-between;font-size:13px"><span style="color:var(--muted)">הוצאות</span><span style="color:#ef4444;font-weight:700" id="db-exp">...</span></div>
                 <div style="height:1px;background:var(--border);margin:7px 0"></div>
                 <div style="display:flex;justify-content:space-between;font-size:13px;font-weight:700"><span>רווח נטו</span><span id="db-net">₪0</span></div>
               </div>
               <div class="card">
                 <div class="sec-title">פרטי 🏠</div>
-                <div style="display:flex;justify-content:space-between;margin-bottom:5px;font-size:13px"><span style="color:var(--muted)">הכנסות</span><span style="color:#10b981;font-weight:700" id="dp-inc">₪0</span></div>
-                <div style="display:flex;justify-content:space-between;font-size:13px"><span style="color:var(--muted)">הוצאות</span><span style="color:#ef4444;font-weight:700" id="dp-exp">₪0</span></div>
+                <div style="display:flex;justify-content:space-between;margin-bottom:5px;font-size:13px"><span style="color:var(--muted)">הכנסות</span><span style="color:#10b981;font-weight:700" id="dp-inc">...</span></div>
+                <div style="display:flex;justify-content:space-between;font-size:13px"><span style="color:var(--muted)">הוצאות</span><span style="color:#ef4444;font-weight:700" id="dp-exp">...</span></div>
                 <div style="height:1px;background:var(--border);margin:7px 0"></div>
                 <div style="display:flex;justify-content:space-between;font-size:13px;font-weight:700"><span>מאזן</span><span id="dp-net">₪0</span></div>
               </div>
@@ -2360,8 +2360,8 @@ async function loadUserData(){
       if(!dbg){
         dbg = document.createElement('div');
         dbg.id = 'debug-fetch-panel';
-        dbg.style = 'position:fixed;top:0;left:0;right:0;background:#ff0000;color:#fff;font-size:14px;font-weight:900;padding:10px;z-index:999999;direction:ltr;text-align:center;font-family:monospace;border-bottom:4px solid yellow';
-        document.body.appendChild(dbg);
+        dbg.style = 'background:#ff0000;color:#fff;font-size:14px;font-weight:900;padding:10px;direction:ltr;text-align:center;font-family:monospace;border-bottom:4px solid yellow';
+        document.body.insertBefore(dbg, document.body.firstChild);
       }
       dbg.textContent = `DEBUG: accounts=${accounts.length} records=${records.length} bankRows=${bankRows.length} @ ${new Date().toLocaleTimeString()}`;
     }catch(e){}
