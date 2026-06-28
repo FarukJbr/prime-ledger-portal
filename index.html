@@ -809,6 +809,16 @@ h2{font-size:16px;font-weight:800;margin-bottom:4px}
           <div id="adm-ann-list"></div>
         </div>
 
+        <!-- CLIENT DATA VIEWER -->
+        <div class="card no-print">
+          <div class="sec-title">👁️ צפייה בנתוני לקוח</div>
+          <p class="subtitle" style="margin-top:-4px">חשבונות, יתרות ורישומים אחרונים — בלי לצאת לפורטל.</p>
+          <select id="adm-view-client-select" onchange="adminViewClientData(this.value)" style="margin-bottom:10px">
+            <option value="">-- בחר לקוח --</option>
+          </select>
+          <div id="adm-client-view-results"></div>
+        </div>
+
         <!-- TAX YEAR LOCK -->
         <div class="card no-print">
           <div class="sec-title">🔒 נעילת שנת מס (דוח שנתי 1301)</div>
@@ -1739,6 +1749,57 @@ async function setTaxYearLock(locked){
   if(error){ alert('שגיאה: '+error.message); return; }
   await checkTaxYearLock();
 }
+// Admin-only read-only snapshot of a specific client's accounts + recent
+// records. Deliberately self-contained (its own local variables, not the
+// global accounts/records/bankRows arrays the logged-in admin's OWN session
+// uses) so viewing a client's data can never overwrite or corrupt the
+// admin's own in-memory state.
+async function adminViewClientData(email){
+  const wrap = el('adm-client-view-results');
+  if(!wrap) return;
+  if(!email){ wrap.innerHTML = ''; return; }
+  wrap.innerHTML = '<div style="color:var(--muted);font-size:12px;padding:10px">טוען...</div>';
+  const [{data:accD, error:accErr}, {data:recD, error:recErr}] = await Promise.all([
+    sb.from('portal_accounts').select('*').eq('client_email', email),
+    sb.from('portal_records').select('*').eq('client_email', email).order('record_date',{ascending:false}).limit(25)
+  ]);
+  if(accErr || recErr){ wrap.innerHTML = `<div style="color:var(--red);font-size:12px">שגיאה: ${(accErr||recErr).message}</div>`; return; }
+  const clientAccounts = accD || [];
+  const clientRecords = recD || [];
+
+  // Need each account's full income/expense to compute a real balance — fetch
+  // all of this client's records once (not just the most recent 25) for that.
+  const {data:allRecD} = await sb.from('portal_records').select('acct_id,amount,type,bank_row_id').eq('client_email', email);
+  const {data:allBankD} = await sb.from('portal_bank_rows').select('acct_id,debit,credit').eq('client_email', email);
+  const balanceFor = (acctId)=>{
+    const aR = (allRecD||[]).filter(r=>r.acct_id===acctId && !r.bank_row_id);
+    const aB = (allBankD||[]).filter(r=>r.acct_id===acctId);
+    const inc = aR.filter(r=>r.type==='הכנסה').reduce((s,r)=>s+Number(r.amount||0),0) + aB.reduce((s,r)=>s+Number(r.credit||0),0);
+    const exp = aR.filter(r=>r.type==='הוצאה').reduce((s,r)=>s+Number(r.amount||0),0) + aB.reduce((s,r)=>s+Number(r.debit||0),0);
+    return Number(accD.find(a=>a.id===acctId)?.opening||0) + inc - exp;
+  };
+
+  const acctsBlock = clientAccounts.length
+    ? `<div class="tbl-wrap"><table class="tbl"><thead><tr><th>חשבון</th><th>סוג</th><th>יתרה</th></tr></thead><tbody>
+        ${clientAccounts.map(a=>{
+          const bal = balanceFor(a.id);
+          return `<tr><td>${a.name}</td><td>${a.type==='bank'?'🏦 בנק':'💳 אשראי'}</td>
+            <td style="font-weight:700;color:${bal>=0?'var(--accent)':'var(--red)'}">${fmt(bal)}</td></tr>`;
+        }).join('')}
+      </tbody></table></div>`
+    : '<div style="color:var(--muted);font-size:12px;padding:8px">אין חשבונות עדיין</div>';
+
+  const recordsBlock = clientRecords.length
+    ? `<div class="tbl-wrap" style="margin-top:8px"><table class="tbl"><thead><tr><th>תאריך</th><th>תיאור</th><th>סכום</th><th>סוג</th></tr></thead><tbody>
+        ${clientRecords.map(r=>`<tr><td>${r.record_date}</td><td>${r.description}</td>
+          <td style="color:${r.type==='הוצאה'?'var(--red)':'var(--accent)'};font-weight:700">${r.type==='הוצאה'?'-':'+'}${fmt(Number(r.amount||0))}</td>
+          <td>${r.type}</td></tr>`).join('')}
+      </tbody></table></div>`
+    : '<div style="color:var(--muted);font-size:12px;padding:8px">אין רישומים עדיין</div>';
+
+  wrap.innerHTML = `<div class="sec-title" style="font-size:12px">חשבונות</div>${acctsBlock}
+    <div class="sec-title" style="font-size:12px;margin-top:10px">רישומים אחרונים (עד 25)</div>${recordsBlock}`;
+}
 async function renderAdminAnnouncements(){
   const list=document.getElementById('adm-ann-list'); if(!list||!sb) return;
   const {data} = await sb.from('portal_announcements').select('*').order('created_at',{ascending:false}).limit(10);
@@ -2065,6 +2126,13 @@ function renderAdminPanel(){
   document.getElementById('adm-active').textContent=list.filter(([,u])=>!u.blocked).length;
   document.getElementById('adm-blocked').textContent=list.filter(([,u])=>u.blocked).length;
   document.getElementById('adm-pro').textContent=list.filter(([,u])=>(u.plan||'free')==='pro').length;
+  const viewSelect = el('adm-view-client-select');
+  if(viewSelect){
+    const prevVal = viewSelect.value;
+    viewSelect.innerHTML = '<option value="">-- בחר לקוח --</option>' +
+      list.map(([email,u])=>`<option value="${email}">${u.name||email} ${u.biz?'('+u.biz+')':''}</option>`).join('');
+    if(prevVal) viewSelect.value = prevVal;
+  }
   // Pending upgrade requests
   const pending=list.filter(([,u])=>u.upgradeRequested);
   document.getElementById('adm-upgrade-req').textContent=pending.length;
