@@ -78,6 +78,14 @@ body{background:var(--bg);color:var(--text);font-family:'Segoe UI','Noto Sans He
 .navbtn{padding:5px 10px;border-radius:6px;border:none;cursor:pointer;font-size:11px;background:transparent;color:var(--muted2);white-space:nowrap;font-weight:500}
 .navbtn.active{background:#10b98120;color:#10b981;font-weight:700}
 .tab-panel{display:none}.tab-panel.active{display:block}
+#admin-subtabs-bar{background:var(--card);border:1px solid var(--border);border-radius:10px;padding:0 8px;display:flex;align-items:center;height:44px;gap:2px;overflow-x:auto;margin-bottom:12px}
+#admin-subtabs-bar::-webkit-scrollbar{display:none}
+.adm-subtab{display:none}.adm-subtab.active{display:block}
+.status-badge{display:inline-block;padding:3px 9px;border-radius:12px;font-size:10px;font-weight:700;white-space:nowrap}
+.status-not-started{background:#64748b20;color:var(--muted)}
+.status-in-progress{background:#f59e0b20;color:var(--yellow)}
+.status-sent{background:#3b82f620;color:var(--blue2)}
+.status-locked{background:#10b98120;color:var(--accent)}
 .card{background:var(--card);border:1px solid var(--border);border-radius:10px;padding:14px;margin-bottom:12px}
 .card2{background:var(--card2);border:1px solid var(--border);border-radius:8px;padding:10px;margin-bottom:6px}
 .sec-title{font-size:13px;font-weight:700;margin-bottom:10px;padding-bottom:8px;border-bottom:1px solid var(--border);display:flex;justify-content:space-between;align-items:center;gap:6px;flex-wrap:wrap}
@@ -774,6 +782,15 @@ h2{font-size:16px;font-weight:800;margin-bottom:4px}
       <!-- ADMIN TAB -->
       <div id="ptab-admin" class="portal-tab">
         <h2>👑 פאנל מנהל</h2><p class="subtitle" style="margin-bottom:16px">ניהול לקוחות, הרשאות ומנויים</p>
+
+        <div id="admin-subtabs-bar">
+          <button class="navbtn active" onclick="switchAdminSubTab('clients',this)">👥 לקוחות</button>
+          <button class="navbtn" onclick="switchAdminSubTab('viewer',this)">👁️ צפייה בנתוני לקוח</button>
+          <button class="navbtn" onclick="switchAdminSubTab('reports',this)">📊 דוחות שנתיים</button>
+        </div>
+
+        <!-- ══ SUB-TAB: CLIENTS ══ -->
+        <div id="adm-sub-clients" class="adm-subtab active">
         <div class="admin-stat-grid">
           <div class="admin-stat"><div class="admin-stat-val" id="adm-total">0</div><div class="admin-stat-lbl">סה"כ משתמשים</div></div>
           <div class="admin-stat"><div class="admin-stat-val" id="adm-active" style="color:#10b981">0</div><div class="admin-stat-lbl">פעילים</div></div>
@@ -807,32 +824,6 @@ h2{font-size:16px;font-weight:800;margin-bottom:4px}
           <div style="height:1px;background:var(--border);margin:12px 0"></div>
           <div style="font-size:11px;color:var(--muted);margin-bottom:8px">עדכונים שפורסמו:</div>
           <div id="adm-ann-list"></div>
-        </div>
-
-        <!-- CLIENT DATA VIEWER -->
-        <div class="card no-print">
-          <div class="sec-title">👁️ צפייה בנתוני לקוח</div>
-          <p class="subtitle" style="margin-top:-4px">חשבונות, יתרות ורישומים אחרונים — בלי לצאת לפורטל.</p>
-          <select id="adm-view-client-select" onchange="adminViewClientData(this.value)" style="margin-bottom:10px">
-            <option value="">-- בחר לקוח --</option>
-          </select>
-          <div id="adm-client-view-results"></div>
-        </div>
-
-        <!-- TAX YEAR LOCK -->
-        <div class="card no-print">
-          <div class="sec-title">🔒 נעילת שנת מס (דוח שנתי 1301)</div>
-          <p class="subtitle" style="margin-top:-4px">לאחר שבדקת את השאלון של לקוח — נעל את השנה כדי שלא יוכל לשנות יותר.</p>
-          <div class="form-grid" style="grid-template-columns:1fr 1fr">
-            <div><div class="form-label">אימייל לקוח</div><input id="adm-lock-email" placeholder="client@email.com"></div>
-            <div><div class="form-label">שנת מס</div><input id="adm-lock-year" placeholder="2025"></div>
-          </div>
-          <div id="adm-lock-status" style="font-size:12px;color:var(--muted);margin-bottom:8px"></div>
-          <div style="display:flex;gap:8px">
-            <button class="btn btn-sm" onclick="checkTaxYearLock()">🔍 בדוק סטטוס</button>
-            <button class="btn-solid" onclick="setTaxYearLock(true)" style="background:var(--yellow);color:#000">🔒 נעל</button>
-            <button class="btn btn-red btn-sm" onclick="setTaxYearLock(false)">🔓 שחרר</button>
-          </div>
         </div>
 
         <!-- SET PERSONAL REMINDER -->
@@ -918,6 +909,43 @@ h2{font-size:16px;font-weight:800;margin-bottom:4px}
           <div class="sec-title">רשימת לקוחות <span id="adm-count" style="color:var(--muted);font-size:11px"></span></div>
           <div id="adm-users-list"><div style="color:var(--muted);font-size:12px">אין משתמשים</div></div>
         </div>
+        </div><!-- /adm-sub-clients -->
+
+        <!-- ══ SUB-TAB: CLIENT DATA VIEWER ══ -->
+        <div id="adm-sub-viewer" class="adm-subtab">
+        <div class="card no-print">
+          <div class="sec-title">👁️ צפייה בנתוני לקוח</div>
+          <p class="subtitle" style="margin-top:-4px">חשבונות, יתרות ורישומים אחרונים — בלי לצאת לפורטל.</p>
+          <select id="adm-view-client-select" onchange="adminViewClientData(this.value)" style="margin-bottom:10px">
+            <option value="">-- בחר לקוח --</option>
+          </select>
+          <div id="adm-client-view-results"></div>
+        </div>
+        </div><!-- /adm-sub-viewer -->
+
+        <!-- ══ SUB-TAB: ANNUAL REPORTS ══ -->
+        <div id="adm-sub-reports" class="adm-subtab">
+        <div class="card no-print">
+          <div class="sec-title">📊 מעקב דוחות שנתיים (1301)</div>
+          <p class="subtitle" style="margin-top:-4px">מי מילא, מי שלח, מי נעול — לכל הלקוחות בבת אחת, לשנה הנבחרת.</p>
+          <div class="form-grid" style="grid-template-columns:1fr auto;align-items:end">
+            <div><div class="form-label">שנת מס</div><input id="adm-reports-year" placeholder="2026" value="2026"></div>
+            <button class="btn-solid" onclick="loadAdminTaxReports()" style="height:34px">🔄 טען</button>
+          </div>
+          <div class="acct-bar no-print" id="adm-reports-filter-bar" style="margin-top:10px">
+            <button class="acct-chip all active" onclick="setReportsFilter('all',this)">הכל</button>
+            <button class="acct-chip" onclick="setReportsFilter('not_started',this)">⬜ לא התחיל</button>
+            <button class="acct-chip" onclick="setReportsFilter('in_progress',this)">✏️ בתהליך</button>
+            <button class="acct-chip" onclick="setReportsFilter('sent',this)">📤 נשלח</button>
+            <button class="acct-chip" onclick="setReportsFilter('locked',this)">🔒 נעול/נבדק</button>
+          </div>
+        </div>
+        <div class="card">
+          <div class="sec-title">סטטוס לקוחות <span id="adm-reports-count" style="color:var(--muted);font-size:11px"></span></div>
+          <div id="adm-reports-list"><div style="color:var(--muted);font-size:12px;padding:10px">בחר שנה ולחץ "טען"</div></div>
+        </div>
+        </div><!-- /adm-sub-reports -->
+
       </div>
 
       <!-- LEGAL TAB -->
@@ -1730,25 +1758,73 @@ async function adminPostAnnouncement(){
   alert('✅ העדכון פורסם לכל הלקוחות');
   renderAdminAnnouncements();
 }
-async function checkTaxYearLock(){
-  const email = el('adm-lock-email').value.trim();
-  const year = el('adm-lock-year').value.trim();
-  const status = el('adm-lock-status');
-  if(!email||!year){ status.textContent='נא למלא אימייל ושנה'; return; }
-  const {data, error} = await sb.from('tax_year_status').select('locked,locked_at,completed_notified_at').eq('client_email',email).eq('tax_year',year).maybeSingle();
-  if(error){ status.textContent='שגיאה: '+error.message; return; }
-  if(!data){ status.textContent='🔓 פתוח (לא ננעל מעולם)'; return; }
-  status.textContent = data.locked ? `🔒 נעול (מאז ${new Date(data.locked_at).toLocaleString('he-IL')})` : '🔓 פתוח';
-  if(data.completed_notified_at) status.textContent += ' · ✓ הלקוח השלים את השאלון';
-}
-async function setTaxYearLock(locked){
-  const email = el('adm-lock-email').value.trim();
-  const year = el('adm-lock-year').value.trim();
-  if(!email||!year){ alert('נא למלא אימייל ושנה'); return; }
+// Toggles lock for a specific client+year, called from inline buttons in the
+// admin reports table (see renderAdminTaxReportsList) — takes explicit
+// parameters rather than reading from a single shared input, since multiple
+// rows in the table each need their own independent lock/unlock action.
+async function setTaxYearLock(email, year, locked){
   const {error} = await sb.rpc('lock_tax_year', {p_email:email, p_year:year, p_locked:locked});
   if(error){ alert('שגיאה: '+error.message); return; }
-  await checkTaxYearLock();
+  await loadAdminTaxReports();
 }
+
+// ── ADMIN: ANNUAL REPORTS OVERVIEW (all clients, one year, with filters) ──
+let adminReportsData = [];
+let adminReportsFilter = 'all';
+function adminReportStatus(row){
+  if(row.locked) return 'locked';
+  if(row.sent_at) return 'sent';
+  if(row.has_started) return 'in_progress';
+  return 'not_started';
+}
+function setReportsFilter(filter, btn){
+  adminReportsFilter = filter;
+  document.querySelectorAll('#adm-reports-filter-bar .acct-chip').forEach(c=>c.classList.remove('active'));
+  if(btn) btn.classList.add('active');
+  renderAdminTaxReportsList();
+}
+async function loadAdminTaxReports(){
+  const year = el('adm-reports-year').value.trim();
+  const list = el('adm-reports-list');
+  if(!year){ alert('נא למלא שנת מס'); return; }
+  list.innerHTML = '<div style="color:var(--muted);font-size:12px;padding:10px">טוען...</div>';
+  const {data, error} = await sb.rpc('admin_get_tax_year_overview', {p_year: year});
+  if(error){ list.innerHTML = `<div style="color:var(--red);font-size:12px;padding:10px">שגיאה: ${error.message}</div>`; return; }
+  adminReportsData = data || [];
+  renderAdminTaxReportsList();
+}
+function renderAdminTaxReportsList(){
+  const list = el('adm-reports-list'); if(!list) return;
+  const year = el('adm-reports-year').value.trim();
+  const filtered = adminReportsFilter==='all' ? adminReportsData : adminReportsData.filter(r=>adminReportStatus(r)===adminReportsFilter);
+  el('adm-reports-count').textContent = `${filtered.length} מתוך ${adminReportsData.length}`;
+  if(!filtered.length){ list.innerHTML = '<div style="color:var(--muted);font-size:12px;padding:10px">אין לקוחות בסטטוס זה</div>'; return; }
+  const statusLabel = {not_started:'⬜ לא התחיל', in_progress:'✏️ בתהליך', sent:'📤 נשלח, ממתין לבדיקה', locked:'🔒 נעול/נבדק'};
+  const statusClass = {not_started:'status-not-started', in_progress:'status-in-progress', sent:'status-sent', locked:'status-locked'};
+  list.innerHTML = filtered.map(r=>{
+    const status = adminReportStatus(r);
+    return `<div class="card2" style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px">
+      <div>
+        <div style="font-weight:600;font-size:13px">${r.client_name}</div>
+        <div style="font-size:11px;color:var(--muted)">${r.client_email}</div>
+        ${r.sent_at?`<div style="font-size:10px;color:var(--muted)">נשלח: ${new Date(r.sent_at).toLocaleDateString('he-IL')}</div>`:''}
+      </div>
+      <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">
+        <span class="status-badge ${statusClass[status]}">${statusLabel[status]}</span>
+        ${r.locked
+          ? `<button class="btn btn-sm" onclick="setTaxYearLock('${r.client_email}','${year}',false)">🔓 שחרר</button>`
+          : `<button class="btn btn-sm" style="border-color:var(--yellow);color:var(--yellow)" onclick="setTaxYearLock('${r.client_email}','${year}',true)">🔒 נעל</button>`}
+      </div>
+    </div>`;
+  }).join('');
+}
+function switchAdminSubTab(name, btn){
+  document.querySelectorAll('#admin-subtabs-bar .navbtn').forEach(b=>b.classList.remove('active'));
+  document.querySelectorAll('#ptab-admin .adm-subtab').forEach(p=>p.classList.remove('active'));
+  if(btn) btn.classList.add('active');
+  const panel = el('adm-sub-'+name); if(panel) panel.classList.add('active');
+}
+
 // Admin-only read-only snapshot of a specific client's accounts + recent
 // records. Deliberately self-contained (its own local variables, not the
 // global accounts/records/bankRows arrays the logged-in admin's OWN session
