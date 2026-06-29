@@ -1409,11 +1409,18 @@ function showAuthTab(tab,btn){
 
 
 async function doLogin(){
+  currentUser = null; // wipe any leftover in-memory user object from a prior session before this login starts
   const email = document.getElementById('login-email').value.trim().toLowerCase();
   const pass = document.getElementById('login-pass').value;
   const err = document.getElementById('login-error');
   err.style.display = 'none';
   if(!sb){ err.textContent='שגיאת התחברות למערכת'; err.style.display='block'; return; }
+  // Defensive: if a PREVIOUS session (e.g. an earlier admin login in this same
+  // non-incognito browser) is still active, sign it out fully BEFORE signing
+  // in as this user — otherwise stale tokens/local state from that earlier
+  // session could carry over and make this login look like it inherited the
+  // previous user's permissions, even though profiles.role itself is correct.
+  await sb.auth.signOut();
   const {data, error} = await sb.auth.signInWithPassword({email, password:pass});
   if(error || !data?.user){ err.style.display='block'; return; }
   const {data:profile, error:profErr} = await sb.from('profiles').select('*').eq('id',data.user.id).maybeSingle();
@@ -1448,6 +1455,8 @@ async function doRegister(){
   if(!/^[0-9+\-\s]{7,15}$/.test(phone)){ err.textContent='טלפון לא תקין'; err.style.display='block'; return; }
   if(!sb){ err.textContent='שגיאת מערכת'; err.style.display='block'; return; }
 
+  // Same defensive measure as doLogin() — clear any leftover session first.
+  await sb.auth.signOut();
   const {data, error} = await sb.auth.signUp({email, password:pass});
   if(error){
     err.textContent = /already|registered|exists/i.test(error.message) ? 'משתמש עם אימייל זה כבר קיים' : ('שגיאת רישום: '+error.message);
