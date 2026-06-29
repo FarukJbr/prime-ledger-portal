@@ -464,6 +464,7 @@ h2{font-size:16px;font-weight:800;margin-bottom:4px}
       <button class="side-btn" onclick="switchPortalTab('recurring',this)"><span class="side-icon">🔁</span> הכנסות/הוצאות קבועות</button>
       <button class="side-btn" onclick="switchPortalTab('loans',this)"><span class="side-icon">🏦</span> הלוואות</button>
       <button class="side-btn" id="files-sb-btn" onclick="switchPortalTab('files',this)"><span class="side-icon">📊</span> דוח שנתי (1301)</button>
+      <button class="side-btn" id="wealth-sb-btn" onclick="switchPortalTab('wealth',this)"><span class="side-icon">🏛️</span> הצהרת הון</button>
       <div class="sidebar-section" id="admin-sb-section" style="display:none">ניהול מנהל</div>
       <button class="side-btn" id="admin-sb-btn" style="display:none" onclick="switchPortalTab('admin',this)"><span class="side-icon">👑</span> פאנל מנהל <span class="side-badge" id="admin-badge-count" style="display:none">0</span></button>
       <div class="sidebar-section">מידע</div>
@@ -926,10 +927,14 @@ h2{font-size:16px;font-weight:800;margin-bottom:4px}
         <!-- ══ SUB-TAB: ANNUAL REPORTS ══ -->
         <div id="adm-sub-reports" class="adm-subtab">
         <div class="card no-print">
-          <div class="sec-title">📊 מעקב דוחות שנתיים (1301)</div>
-          <p class="subtitle" style="margin-top:-4px">מי מילא, מי שלח, מי נעול — לכל הלקוחות בבת אחת, לשנה הנבחרת.</p>
-          <div class="form-grid" style="grid-template-columns:1fr auto;align-items:end">
-            <div><div class="form-label">שנת מס</div><input id="adm-reports-year" placeholder="2026" value="2026"></div>
+          <div class="sec-title">📊 מעקב דוחות שנתיים והצהרות הון</div>
+          <p class="subtitle" style="margin-top:-4px">מי מילא, מי שלח, מי נעול — לכל הלקוחות בבת אחת.</p>
+          <div class="form-grid" style="grid-template-columns:1fr 1fr auto;align-items:end">
+            <div><div class="form-label">סוג</div><select id="adm-reports-type" onchange="loadAdminTaxReports()">
+              <option value="annual_report">📊 דוח שנתי (1301)</option>
+              <option value="wealth">🏛️ הצהרת הון</option>
+            </select></div>
+            <div><div class="form-label">שנה</div><input id="adm-reports-year" placeholder="2026" value="2026"></div>
             <button class="btn-solid" onclick="loadAdminTaxReports()" style="height:34px">🔄 טען</button>
           </div>
           <div class="acct-bar no-print" id="adm-reports-filter-bar" style="margin-top:10px">
@@ -1195,6 +1200,40 @@ h2{font-size:16px;font-weight:800;margin-bottom:4px}
             <button class="btn-solid" onclick="document.getElementById('tax-file-input').click()" style="width:100%">📤 העלה קובץ</button>
           </div>
           <div id="tax-files-list"><div class="card" style="text-align:center;color:var(--muted);padding:24px">טוען...</div></div>
+        </div>
+      </div>
+
+      <!-- WEALTH DECLARATION TAB -->
+      <div id="ptab-wealth" class="portal-tab">
+        <h2>🏛️ הצהרת הון</h2>
+        <p class="subtitle">מוגשת רק לפי דרישה מרשות המסים — תיקייה לפי שנת ההצהרה (התאריך אליו היא מתייחסת)</p>
+
+        <div id="wealth-year-view">
+          <div class="card no-print">
+            <div class="sec-title">תיקיות (שנות הצהרה)</div>
+            <div style="display:flex;gap:8px;margin-bottom:10px">
+              <input id="new-wealth-year" type="number" placeholder="2026" style="max-width:120px">
+              <button class="btn-solid" onclick="createWealthYearFolder()" style="white-space:nowrap">+ תיקייה חדשה</button>
+            </div>
+          </div>
+          <div id="wealth-years-list"><div class="card" style="text-align:center;color:var(--muted);padding:24px">טוען...</div></div>
+        </div>
+
+        <div id="wealth-inside-year" style="display:none">
+          <button class="btn btn-sm no-print" onclick="closeWealthYearFolder()" style="margin-bottom:10px">→ חזרה לתיקיות</button>
+
+          <div class="card">
+            <div class="sec-title">📝 שאלון הצהרת הון — שנה <span id="wealth-year-label" style="color:var(--accent)"></span></div>
+            <p class="subtitle" style="margin-top:-4px">פרט את כל הנכסים וההתחייבויות שלך, של בן/בת זוגך ושל ילדיכם מתחת לגיל 18, נכון לתאריך ההצהרה. דווח לפי עלות רכישה בפועל — לא שווי שוק.</p>
+            <div id="wealth-questionnaire-body"></div>
+          </div>
+
+          <div class="card no-print">
+            <div class="sec-title">תיקייה — קבצים נוספים</div>
+            <input type="file" id="wealth-file-input" style="display:none" onchange="uploadWealthFile(this.files[0])">
+            <button class="btn-solid" onclick="document.getElementById('wealth-file-input').click()" style="width:100%">📤 העלה קובץ</button>
+          </div>
+          <div id="wealth-files-list"><div class="card" style="text-align:center;color:var(--muted);padding:24px">טוען...</div></div>
         </div>
       </div>
 
@@ -1473,6 +1512,7 @@ async function enterPortal(){
     document.getElementById('referral-sb-btn').style.display='none';
     document.getElementById('ai-assistant-card').style.display='none';
     document.getElementById('files-sb-btn').style.display='none';
+    document.getElementById('wealth-sb-btn').style.display='none';
   }
   const imgEl = document.getElementById('portal-logo-img');
   if(imgEl) imgEl.src = document.getElementById('print-logo').src;
@@ -1599,6 +1639,7 @@ function switchPortalTab(name,btn){
   if(name==='plans') renderPlansTab();
   if(name==='referral') renderReferralTab();
   if(name==='files'){ currentTaxYear=null; el('files-inside-year').style.display='none'; el('files-year-view').style.display='block'; loadTaxYears(); }
+  if(name==='wealth'){ currentWealthYear=null; el('wealth-inside-year').style.display='none'; el('wealth-year-view').style.display='block'; loadWealthYears(); }
 }
 
 // ── LEGAL ──
@@ -1762,8 +1803,9 @@ async function adminPostAnnouncement(){
 // admin reports table (see renderAdminTaxReportsList) — takes explicit
 // parameters rather than reading from a single shared input, since multiple
 // rows in the table each need their own independent lock/unlock action.
-async function setTaxYearLock(email, year, locked){
-  const {error} = await sb.rpc('lock_tax_year', {p_email:email, p_year:year, p_locked:locked});
+async function setTaxYearLock(email, year, locked, type){
+  type = type || 'annual_report';
+  const {error} = await sb.rpc('lock_tax_year', {p_email:email, p_year:year, p_locked:locked, p_type:type});
   if(error){ alert('שגיאה: '+error.message); return; }
   await loadAdminTaxReports();
 }
@@ -1785,10 +1827,11 @@ function setReportsFilter(filter, btn){
 }
 async function loadAdminTaxReports(){
   const year = el('adm-reports-year').value.trim();
+  const type = el('adm-reports-type').value;
   const list = el('adm-reports-list');
-  if(!year){ alert('נא למלא שנת מס'); return; }
+  if(!year){ alert('נא למלא שנה'); return; }
   list.innerHTML = '<div style="color:var(--muted);font-size:12px;padding:10px">טוען...</div>';
-  const {data, error} = await sb.rpc('admin_get_tax_year_overview', {p_year: year});
+  const {data, error} = await sb.rpc('admin_get_tax_year_overview', {p_year: year, p_type: type});
   if(error){ list.innerHTML = `<div style="color:var(--red);font-size:12px;padding:10px">שגיאה: ${error.message}</div>`; return; }
   adminReportsData = data || [];
   renderAdminTaxReportsList();
@@ -1796,6 +1839,7 @@ async function loadAdminTaxReports(){
 function renderAdminTaxReportsList(){
   const list = el('adm-reports-list'); if(!list) return;
   const year = el('adm-reports-year').value.trim();
+  const type = el('adm-reports-type').value;
   const filtered = adminReportsFilter==='all' ? adminReportsData : adminReportsData.filter(r=>adminReportStatus(r)===adminReportsFilter);
   el('adm-reports-count').textContent = `${filtered.length} מתוך ${adminReportsData.length}`;
   if(!filtered.length){ list.innerHTML = '<div style="color:var(--muted);font-size:12px;padding:10px">אין לקוחות בסטטוס זה</div>'; return; }
@@ -1812,8 +1856,8 @@ function renderAdminTaxReportsList(){
       <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">
         <span class="status-badge ${statusClass[status]}">${statusLabel[status]}</span>
         ${r.locked
-          ? `<button class="btn btn-sm" onclick="setTaxYearLock('${r.client_email}','${year}',false)">🔓 שחרר</button>`
-          : `<button class="btn btn-sm" style="border-color:var(--yellow);color:var(--yellow)" onclick="setTaxYearLock('${r.client_email}','${year}',true)">🔒 נעל</button>`}
+          ? `<button class="btn btn-sm" onclick="setTaxYearLock('${r.client_email}','${year}',false,'${type}')">🔓 שחרר</button>`
+          : `<button class="btn btn-sm" style="border-color:var(--yellow);color:var(--yellow)" onclick="setTaxYearLock('${r.client_email}','${year}',true,'${type}')">🔒 נעל</button>`}
       </div>
     </div>`;
   }).join('');
@@ -2831,7 +2875,7 @@ async function loadTaxYears(){
   const wrap = el('tax-years-list'); if(!wrap || !sb || !currentUser) return;
   const {data, error} = await sb.storage.from(TAX_BUCKET).list(taxBasePath());
   if(error){ wrap.innerHTML = `<div class="card" style="color:var(--red)">שגיאה בטעינת התיקיות: ${error.message}</div>`; return; }
-  const years = (data||[]).filter(d=>d.id===null).map(d=>d.name).sort((a,b)=>b-a);
+  const years = (data||[]).filter(d=>d.id===null && !d.name.startsWith(WEALTH_BUCKET_PREFIX)).map(d=>d.name).sort((a,b)=>b-a);
   if(!years.length){ wrap.innerHTML = '<div class="card" style="text-align:center;color:var(--muted);padding:24px">אין תיקיות עדיין — הוסף שנת מס</div>'; return; }
   wrap.innerHTML = years.map(y=>`<div class="card" style="display:flex;justify-content:space-between;align-items:center;cursor:pointer" onclick="openTaxYearFolder('${y}')">
     <div style="display:flex;align-items:center;gap:10px"><span style="font-size:22px">📁</span><span style="font-weight:700">שנת מס ${y}</span></div>
@@ -3185,6 +3229,580 @@ async function sendToOffice(){
 function startSectionUpload(key){
   pendingUploadSection = key;
   el('tax-file-input').click();
+}
+
+// ════════════════════════════════════════════════════════════════
+// WEALTH DECLARATION (הצהרת הון) — reuses the SAME backend tables/RPCs
+// as the annual report (tax_questionnaire / tax_year_status), distinguished
+// by declaration_type='wealth', and the SAME storage bucket with folders
+// named "wealth-{year}" instead of plain "{year}" — see storage_year_and_type()
+// in the DB for how the lock check tells the two apart from the path alone.
+// Rendering is fundamentally different though: most sections here are
+// REPEATABLE TABLES (multiple rows: properties, accounts, etc.), not a
+// single yes/no+field like the annual report — hence a separate generic
+// table/entity engine below rather than reusing renderQuestionnaire().
+// ════════════════════════════════════════════════════════════════
+const WEALTH_BUCKET_PREFIX = 'wealth-';
+let currentWealthYear = null;
+let currentWealthFiles = [];
+let wealthYearLocked = false;
+let wealthAnswersDirty = false;
+let wealthSentAt = null;
+let pendingWealthUploadSection = null;
+
+// Part A — personal assets (1-12) and liabilities (13-14). hasOwner adds a
+// "שייך ל" column (עצמי/בן-בת זוג/שם ילד) since the form wants ONE shared
+// household table per category, not a duplicated section per family member.
+const WEALTH_SECTIONS_A = [
+  {key:'realestate_il', icon:'🏠', q:'נדל"ן בארץ (דירה, בית, מחסן, קרקע, משרד וכו\')', hasOwner:true, requiresDoc:true, hint:'יש לצרף נסח טאבו/חוזה רכישה.',
+    columns:[{id:'type',label:'סוג הנכס'},{id:'address',label:'כתובת/גוש-חלקה-תת-חלקה'},{id:'date',label:'תאריך רכישה',type:'date'},{id:'cost',label:'עלות רכישה (₪)',type:'number'},{id:'notes',label:'הערות'}]},
+  {key:'realestate_abroad', icon:'🌍', q:'נדל"ן בחו"ל', hasOwner:true, requiresDoc:true, hint:'נא לציין מדינה ועלות בשקלים.',
+    columns:[{id:'type',label:'סוג הנכס'},{id:'country',label:'מדינה וכתובת'},{id:'date',label:'תאריך רכישה',type:'date'},{id:'cost',label:'עלות רכישה (₪)',type:'number'},{id:'notes',label:'הערות'}]},
+  {key:'bank_accounts', icon:'🏦', q:'חשבונות בנק ומוסדות פיננסיים (כולל דיגיטליים כמו PayPal)', hasOwner:true, requiresDoc:true, hint:'יש לצרף אישור יתרה מהבנק ליום ההצהרה. משיכת יתר = מספר שלילי.',
+    columns:[{id:'bank',label:'בנק/מוסד'},{id:'account',label:'מס\' חשבון וסניף'},{id:'country',label:'מדינה'},{id:'currency',label:'מטבע'},{id:'amount_fc',label:'יתרה במטבע',type:'number'},{id:'amount_ils',label:'יתרה (₪)',type:'number'}]},
+  {key:'digital_assets', icon:'₿', q:'נכסים דיגיטליים (ביטקוין, את\'ריום, NFT וכו\')', hasOwner:true, requiresDoc:true, hint:'יש לצרף דוח יתרות/צילום מסך מהארנק או הבורסה.',
+    columns:[{id:'currency_type',label:'סוג המטבע'},{id:'quantity',label:'כמות',type:'number'},{id:'date',label:'תאריך רכישה',type:'date'},{id:'wallet',label:'כתובת ארנק/בורסה'},{id:'cost',label:'עלות (₪)',type:'number'}]},
+  {key:'cash_outside_bank', icon:'💵', q:'מזומנים שאינם מופקדים בבנק', hasOwner:true, requiresDoc:false,
+    columns:[{id:'currency',label:'סוג מטבע'},{id:'amount_fc',label:'סכום במטבע',type:'number'},{id:'amount_ils',label:'סכום (₪)',type:'number'}]},
+  {key:'pension_gemel', icon:'💰', q:'ביטוח חיים, קופות גמל, פנסיה, קרן השתלמות', hasOwner:true, requiresDoc:true, hint:'סך ההפקדות (קרן בלבד, בלי רווחים) לפי "אישור להצהרת הון".',
+    columns:[{id:'savings_type',label:'סוג החיסכון'},{id:'company',label:'שם החברה/הגוף'},{id:'country',label:'מדינה'},{id:'deposits',label:'סכום הפקדות (₪)',type:'number'},{id:'notes',label:'הערות'}]},
+  {key:'securities', icon:'📈', q:'השקעות בניירות ערך וקרנות נאמנות', hasOwner:true, requiresDoc:true, hint:'עלות ההשקעה בפועל, לא שווי שוק.',
+    columns:[{id:'institution',label:'מוסד/ברוקר'},{id:'account',label:'מספר חשבון'},{id:'sec_type',label:'סוג ני"ע/קרן'},{id:'cost',label:'עלות (₪)',type:'number'}]},
+  {key:'loans_given', icon:'🤝', q:'הלוואות שנתת לאחרים (אתה המלווה)', hasOwner:true, requiresDoc:false, hint:'במונחי קרן בלבד, בלי ריבית שטרם נצברה.',
+    columns:[{id:'name',label:'שם החייב/ת'},{id:'relation',label:'קרבה'},{id:'id_number',label:'מס\' זהות/ח.פ'},{id:'year',label:'שנת יצירת החוב'},{id:'amount',label:'סכום (₪)',type:'number'}]},
+  {key:'vehicles', icon:'🚗', q:'כלי תחבורה — רכב, שייט, טייס', hasOwner:true, requiresDoc:true, hint:'יש לצרף רישיון רכב/רישום כלי שייט או טיס.',
+    columns:[{id:'type',label:'סוג כלי התחבורה'},{id:'license',label:'מספר רישוי/רישום'},{id:'date',label:'תאריך רכישה',type:'date'},{id:'cost',label:'עלות (₪)',type:'number'}]},
+  {key:'jewelry_art', icon:'💎', q:'תכשיטים, זהב, יהלומים, אספנות ואומנות', hasOwner:true, requiresDoc:false,
+    columns:[{id:'description',label:'תיאור הפריט'},{id:'date',label:'תאריך רכישה (משוער)',type:'date'},{id:'cost',label:'עלות משוערת (₪)',type:'number'}]},
+  {key:'home_contents', icon:'🛋️', q:'תכולת הדירה/הבית', hasOwner:false, requiresDoc:false, hint:'ריהוט, מוצרי חשמל וכו\' — אפשר אומדן כללי.',
+    columns:[{id:'description',label:'תיאור'},{id:'date',label:'תאריך רכישה (משוער)',type:'date'},{id:'cost',label:'עלות משוערת (₪)',type:'number'}]},
+  {key:'other_personal_assets', icon:'📦', q:'רכוש פרטי אחר שלא פורט לעיל', hasOwner:true, requiresDoc:false,
+    columns:[{id:'description',label:'תיאור'},{id:'date',label:'תאריך רכישה (משוער)',type:'date'},{id:'cost',label:'עלות משוערת (₪)',type:'number'}]},
+  {key:'loans_mortgages', icon:'🏦', q:'התחייבות: הלוואות ומשכנתאות מבנקים/מוסדות', hasOwner:true, requiresDoc:true, isLiability:true, hint:'יש לצרף אישור יתרת הלוואה/משכנתא. במונחי קרן בלבד.',
+    columns:[{id:'bank',label:'בנק/מוסד'},{id:'account',label:'מס\' חשבון/הלוואה'},{id:'country',label:'מדינה'},{id:'currency',label:'מטבע'},{id:'amount_fc',label:'סכום במטבע',type:'number'},{id:'amount_ils',label:'סכום (₪)',type:'number'}]},
+  {key:'loans_from_others', icon:'📝', q:'התחייבות: הלוואות שלקחת מאחרים (לא מבנק)', hasOwner:true, requiresDoc:false, isLiability:true,
+    columns:[{id:'name',label:'שם המלווה'},{id:'relation',label:'קרבה'},{id:'id_number',label:'מס\' זהות/ח.פ'},{id:'year',label:'שנת יצירת החוב'},{id:'amount',label:'סכום (₪)',type:'number'}]},
+];
+
+// Part C — business WITHOUT a balance sheet, gated behind one yes/no. Mostly
+// tables, a few simple amount fields (cash, credit cards pending, etc.)
+const WEALTH_SECTIONS_C = [
+  {key:'biz_cash', icon:'💵', q:'מזומנים ושיקים בקופה', type:'simple', field:{id:'amount',label:'סכום (₪)',type:'number'}},
+  {key:'biz_checks_receivable', icon:'📄', q:'שיקים/שטרות לקבל', columns:[{id:'description',label:'תיאור'},{id:'amount',label:'סכום (₪)',type:'number'}]},
+  {key:'biz_credit_cards_pending', icon:'💳', q:'כרטיסי אשראי שטרם הועברו לחשבון', type:'simple', field:{id:'amount',label:'סכום (₪)',type:'number'}},
+  {key:'biz_customers_debts', icon:'🧾', q:'לקוחות וחובות פתוחים', columns:[{id:'name',label:'שם'},{id:'amount',label:'סכום (₪)',type:'number'}]},
+  {key:'biz_inventory', icon:'📦', q:'מלאי (חומרי גלם, בעבודה, מוצר מוגמר — לפי עלות)', type:'simple', field:{id:'amount',label:'עלות (₪)',type:'number'}},
+  {key:'biz_other_current_assets', icon:'➕', q:'רכוש שוטף אחר (למשל מע"מ תשומות שטרם הושב)', type:'simple', field:{id:'amount',label:'סכום (₪)',type:'number'}},
+  {key:'biz_bank_accounts', icon:'🏦', q:'חשבונות בנק של העסק', requiresDoc:true,
+    columns:[{id:'bank',label:'בנק/מוסד'},{id:'account',label:'מס\' חשבון וסניף'},{id:'country',label:'מדינה'},{id:'currency',label:'מטבע'},{id:'amount_fc',label:'יתרה במטבע',type:'number'},{id:'amount_ils',label:'יתרה (₪)',type:'number'}]},
+  {key:'biz_securities', icon:'📈', q:'ניירות ערך וקרנות נאמנות של העסק',
+    columns:[{id:'institution',label:'מוסד/ברוקר'},{id:'account',label:'מספר חשבון'},{id:'sec_type',label:'סוג ני"ע/קרן'},{id:'cost',label:'עלות (₪)',type:'number'}]},
+  {key:'biz_loans_given', icon:'🤝', q:'הלוואות שהעסק נתן לאחרים, וחייבים אחרים',
+    columns:[{id:'name',label:'שם החייב/ת'},{id:'relation',label:'קרבה'},{id:'id_number',label:'מס\' זהות/ח.פ'},{id:'year',label:'שנת יצירת החוב'},{id:'amount',label:'סכום (₪)',type:'number'}]},
+  {key:'biz_digital_assets', icon:'₿', q:'נכסים דיגיטליים של העסק',
+    columns:[{id:'currency_type',label:'סוג המטבע'},{id:'quantity',label:'כמות',type:'number'},{id:'date',label:'תאריך רכישה',type:'date'},{id:'wallet',label:'כתובת ארנק/בורסה'},{id:'cost',label:'עלות (₪)',type:'number'}]},
+  {key:'biz_realestate_il', icon:'🏠', q:'נדל"ן עסקי בארץ', requiresDoc:true,
+    columns:[{id:'type',label:'סוג הנכס'},{id:'address',label:'כתובת/גוש-חלקה'},{id:'date',label:'תאריך רכישה',type:'date'},{id:'cost',label:'עלות (₪)',type:'number'},{id:'notes',label:'הערות'}]},
+  {key:'biz_realestate_abroad', icon:'🌍', q:'נדל"ן עסקי בחו"ל',
+    columns:[{id:'type',label:'סוג הנכס'},{id:'country',label:'מדינה וכתובת'},{id:'date',label:'תאריך רכישה',type:'date'},{id:'cost',label:'עלות (₪)',type:'number'},{id:'notes',label:'הערות'}]},
+  {key:'biz_vehicles_equipment', icon:'🚛', q:'כלי רכב, שייט, טייס עסקיים וציוד כבד', requiresDoc:true,
+    columns:[{id:'type',label:'סוג'},{id:'license',label:'מספר רישוי/רישום'},{id:'date',label:'תאריך רכישה',type:'date'},{id:'cost',label:'עלות (₪)',type:'number'}]},
+  {key:'biz_machinery_furniture', icon:'🛠️', q:'מכונות, ציוד, מכשירים וריהוט',
+    columns:[{id:'description',label:'תיאור'},{id:'date',label:'תאריך רכישה (משוער)',type:'date'},{id:'cost',label:'עלות משוערת (₪)',type:'number'}]},
+  {key:'biz_other_fixed_assets', icon:'📋', q:'רכוש קבוע אחר (מוניטין, פטנטים, זיכיונות וכו\')',
+    columns:[{id:'description',label:'תיאור'},{id:'date',label:'תאריך רכישה (משוער)',type:'date'},{id:'cost',label:'עלות משוערת (₪)',type:'number'}]},
+  {key:'biz_advance_payments', icon:'⏳', q:'תשלומים על חשבון רכוש קבוע (מקדמות)',
+    columns:[{id:'description',label:'תיאור הנכס'},{id:'amount',label:'סכום (₪)',type:'number'}]},
+  {key:'biz_suppliers', icon:'🚚', q:'התחייבות: חובות לספקים', isLiability:true,
+    columns:[{id:'description',label:'תיאור'},{id:'amount',label:'סכום (₪)',type:'number'}]},
+  {key:'biz_checks_payable', icon:'📄', q:'התחייבות: שיקים/שטרות לפירעון', type:'simple', isLiability:true, field:{id:'amount',label:'סכום (₪)',type:'number'}},
+  {key:'biz_bank_loans', icon:'🏦', q:'התחייבות: הלוואות מבנקים (עסק)', isLiability:true,
+    columns:[{id:'bank',label:'בנק/מוסד'},{id:'account',label:'מס\' חשבון/הלוואה'},{id:'country',label:'מדינה'},{id:'currency',label:'מטבע'},{id:'amount_fc',label:'סכום במטבע',type:'number'},{id:'amount_ils',label:'סכום (₪)',type:'number'}]},
+  {key:'biz_other_loans', icon:'📝', q:'התחייבות: הלוואות מאחרים, זכאים (עסק)', isLiability:true,
+    columns:[{id:'name',label:'שם הגורם'},{id:'relation',label:'קרבה'},{id:'id_number',label:'מס\' זהות/ח.פ'},{id:'year',label:'שנת יצירת החוב'},{id:'amount',label:'סכום (₪)',type:'number'}]},
+];
+
+// Part D — miscellaneous, each with its own simple shape.
+const WEALTH_PART_D_TABLE = [{id:'description',label:'תיאור הרכוש/ההתחייבות'},{id:'owner_name',label:'שם הבעלים'},{id:'owner_id',label:'מס\' זהות/ח.פ'},{id:'amount',label:'סכום (₪)',type:'number'}];
+
+let wealthAnswers = {}; // section_key -> {has_data, rows:[...]} for tables, or {has_data, value} for simple
+let wealthEntities = []; // Part B business-with-balance-sheet entities
+let wealthPersonalInfo = {
+  idNumber:'', birthDate:'', address:'', taxFileNumber:'',
+  spouseBirthDate:'', sharedHousehold:false,
+  children:[], // [{name,id,birthDate}]
+  declarationDate:'', requestDate:'', isFirstDeclaration:'',
+  prevNetWorth:'', prevDeclarationDate:'',
+  hasBusinessWithBalance:false, hasBusinessNoBalance:false,
+  hasSafe:false, safeLocation:'', safeHasUnownedProperty:false, safeUnownedRows:[],
+  hasPoa:false, poaRows:[],
+  hasUnownedProperty:false, unownedRows:[],
+};
+
+function wealthSectionHasUpload(key){
+  return currentWealthFiles.some(f=>f.name.startsWith(key+'__'));
+}
+
+// ── FOLDER MANAGEMENT (mirrors createTaxYearFolder/openTaxYearFolder exactly,
+// just pointed at "wealth-{year}" paths in the same bucket) ──
+async function loadWealthYears(){
+  const wrap = el('wealth-years-list'); if(!wrap) return;
+  const {data, error} = await sb.storage.from(TAX_BUCKET).list(taxBasePath());
+  if(error){ wrap.innerHTML = `<div class="card" style="color:var(--red)">שגיאה: ${error.message}</div>`; return; }
+  const years = (data||[]).filter(d=>d.id===null && d.name.startsWith(WEALTH_BUCKET_PREFIX)).map(d=>d.name.slice(WEALTH_BUCKET_PREFIX.length));
+  if(!years.length){ wrap.innerHTML = '<div class="card" style="text-align:center;color:var(--muted);padding:24px">אין תיקיות עדיין</div>'; return; }
+  wrap.innerHTML = years.map(y=>`<div class="card2" style="display:flex;justify-content:space-between;align-items:center">
+    <button class="btn" style="flex:1;text-align:right" onclick="openWealthYearFolder('${y}')">📁 שנה ${y}</button>
+    <button class="btn btn-red btn-sm no-print" onclick="deleteWealthYearFolder('${y}')">מחק</button>
+  </div>`).join('');
+}
+async function createWealthYearFolder(){
+  const year = el('new-wealth-year').value.trim();
+  if(!year){ alert('נא להזין שנה'); return; }
+  const path = `${taxBasePath()}/${WEALTH_BUCKET_PREFIX}${year}/.placeholder`;
+  const {error} = await sb.storage.from(TAX_BUCKET).upload(path, new Blob(['']), {upsert:true});
+  if(error){ alert('שגיאה: '+error.message); return; }
+  el('new-wealth-year').value = '';
+  loadWealthYears();
+}
+async function deleteWealthYearFolder(year){
+  if(!confirm(`למחוק את כל תיקיית שנה ${year} (כולל כל הקבצים)?`)) return;
+  const {data} = await sb.storage.from(TAX_BUCKET).list(`${taxBasePath()}/${WEALTH_BUCKET_PREFIX}${year}`);
+  const paths = (data||[]).map(f=>`${taxBasePath()}/${WEALTH_BUCKET_PREFIX}${year}/${f.name}`);
+  if(paths.length) await sb.storage.from(TAX_BUCKET).remove(paths);
+  loadWealthYears();
+}
+async function openWealthYearFolder(year){
+  currentWealthYear = year;
+  el('wealth-year-label').textContent = year;
+  el('wealth-year-view').style.display = 'none';
+  el('wealth-inside-year').style.display = 'block';
+  await loadWealthFiles();
+  loadWealthQuestionnaire();
+}
+function closeWealthYearFolder(){
+  currentWealthYear = null;
+  el('wealth-inside-year').style.display = 'none';
+  el('wealth-year-view').style.display = 'block';
+  loadWealthYears();
+}
+async function loadWealthFiles(){
+  const wrap = el('wealth-files-list'); if(!wrap || !currentWealthYear) return;
+  const {data, error} = await sb.storage.from(TAX_BUCKET).list(`${taxBasePath()}/${WEALTH_BUCKET_PREFIX}${currentWealthYear}`);
+  if(error){ wrap.innerHTML = `<div class="card" style="color:var(--red)">שגיאה: ${error.message}</div>`; return; }
+  const files = (data||[]).filter(f=>f.name!=='.placeholder');
+  currentWealthFiles = files;
+  if(!files.length){ wrap.innerHTML = '<div class="card" style="text-align:center;color:var(--muted);padding:24px">אין קבצים בתיקייה זו עדיין</div>'; return; }
+  wrap.innerHTML = files.map(f=>{
+    const sizeKb = f.metadata?.size ? Math.round(f.metadata.size/1024) : '?';
+    const sep = f.name.indexOf('__');
+    const sectionKey = sep>0 ? f.name.slice(0,sep) : null;
+    const allSections = [...WEALTH_SECTIONS_A, ...WEALTH_SECTIONS_C];
+    const section = sectionKey ? allSections.find(s=>s.key===sectionKey) : null;
+    const displayName = section ? `${section.icon} ${f.name.slice(sep+2)}` : `📄 ${f.name}`;
+    return `<div class="card2" style="display:flex;justify-content:space-between;align-items:center">
+      <div><div style="font-weight:600;font-size:12px">${displayName}</div><div style="font-size:10px;color:var(--muted)">${sizeKb} KB</div></div>
+      <div style="display:flex;gap:6px;flex-shrink:0">
+        <button class="btn btn-sm" onclick="downloadWealthFile('${f.name}')">⬇️</button>
+        <button class="btn btn-red btn-sm no-print" onclick="deleteWealthFile('${f.name}')">מחק</button>
+      </div>
+    </div>`;
+  }).join('');
+}
+async function uploadWealthFile(file){
+  if(!file || !currentWealthYear) return;
+  const finalName = pendingWealthUploadSection ? `${pendingWealthUploadSection}__${file.name}` : file.name;
+  pendingWealthUploadSection = null;
+  const path = `${taxBasePath()}/${WEALTH_BUCKET_PREFIX}${currentWealthYear}/${finalName}`;
+  const {error} = await sb.storage.from(TAX_BUCKET).upload(path, file, {upsert:true});
+  el('wealth-file-input').value = '';
+  if(error){ alert('שגיאה בהעלאה: '+error.message); return; }
+  await loadWealthFiles();
+  renderWealthQuestionnaire();
+}
+async function downloadWealthFile(name){
+  const path = `${taxBasePath()}/${WEALTH_BUCKET_PREFIX}${currentWealthYear}/${name}`;
+  const {data, error} = await sb.storage.from(TAX_BUCKET).createSignedUrl(path, 60);
+  if(error){ alert('שגיאה: '+error.message); return; }
+  window.open(data.signedUrl, '_blank');
+}
+async function deleteWealthFile(name){
+  if(!confirm(`למחוק את "${name}"?`)) return;
+  const path = `${taxBasePath()}/${WEALTH_BUCKET_PREFIX}${currentWealthYear}/${name}`;
+  const {error} = await sb.storage.from(TAX_BUCKET).remove([path]);
+  if(error){ alert('שגיאה: '+error.message); return; }
+  await loadWealthFiles();
+  renderWealthQuestionnaire();
+}
+function startWealthUpload(key){
+  pendingWealthUploadSection = key;
+  el('wealth-file-input').click();
+}
+
+// ── GENERIC TABLE ROW ENGINE (reused across all ~30 table-type sections) ──
+function emptyRowFor(columns){
+  const row = {};
+  columns.forEach(c=>row[c.id]='');
+  return row;
+}
+function addWealthRow(sectionKey, columns){
+  wealthAnswers[sectionKey] = wealthAnswers[sectionKey] || {has_data:true, rows:[]};
+  wealthAnswers[sectionKey].rows = wealthAnswers[sectionKey].rows || [];
+  wealthAnswers[sectionKey].rows.push(emptyRowFor(columns));
+  wealthAnswersDirty = true;
+  renderWealthQuestionnaire();
+}
+function removeWealthRow(sectionKey, idx){
+  if(!wealthAnswers[sectionKey]) return;
+  wealthAnswers[sectionKey].rows.splice(idx,1);
+  wealthAnswersDirty = true;
+  renderWealthQuestionnaire();
+}
+function updateWealthRow(sectionKey, idx, fieldId, val){
+  if(!wealthAnswers[sectionKey] || !wealthAnswers[sectionKey].rows[idx]) return;
+  wealthAnswers[sectionKey].rows[idx][fieldId] = val;
+  wealthAnswersDirty = true;
+}
+function setWealthSectionAnswer(sectionKey, val, columns){
+  wealthAnswers[sectionKey] = wealthAnswers[sectionKey] || {rows:[]};
+  wealthAnswers[sectionKey].has_data = val;
+  if(val && (!wealthAnswers[sectionKey].rows || !wealthAnswers[sectionKey].rows.length) && columns){
+    wealthAnswers[sectionKey].rows = [emptyRowFor(columns)];
+  }
+  wealthAnswersDirty = true;
+  renderWealthQuestionnaire();
+}
+function setWealthSimpleAnswer(sectionKey, val){
+  wealthAnswers[sectionKey] = wealthAnswers[sectionKey] || {};
+  wealthAnswers[sectionKey].has_data = val;
+  wealthAnswersDirty = true;
+  renderWealthQuestionnaire();
+}
+function setWealthSimpleValue(sectionKey, val){
+  wealthAnswers[sectionKey] = wealthAnswers[sectionKey] || {has_data:true};
+  wealthAnswers[sectionKey].value = val;
+  wealthAnswersDirty = true;
+}
+
+// ── GENERIC ENTITY ENGINE (Part B — business with balance sheet) ──
+const WEALTH_ENTITY_FIELDS = [
+  {id:'name',label:'שם העסק/השותפות/החברה'},{id:'reg_number',label:'מס\' ח.פ/עוסק/שותפות'},
+  {id:'entity_type',label:'סוג הגוף'},{id:'country',label:'מדינת התאגדות/פעילות'},
+  {id:'ownership_pct',label:'אחוז ההחזקה (%)',type:'number'},{id:'capital_account',label:'יתרת חשבון הון (₪)',type:'number'},
+  {id:'current_account',label:'יתרת חו"ז (₪, שלילי אם אתה חייב)',type:'number'},
+  {id:'loans_given_to_biz',label:'הלוואות שנתת לעסק (₪)',type:'number'},{id:'loans_taken_from_biz',label:'הלוואות שלקחת מהעסק (₪)',type:'number'},
+];
+function addWealthEntity(){
+  wealthEntities.push(emptyRowFor(WEALTH_ENTITY_FIELDS));
+  wealthAnswersDirty = true;
+  renderWealthQuestionnaire();
+}
+function removeWealthEntity(idx){
+  wealthEntities.splice(idx,1);
+  wealthAnswersDirty = true;
+  renderWealthQuestionnaire();
+}
+function updateWealthEntity(idx, fieldId, val){
+  if(!wealthEntities[idx]) return;
+  wealthEntities[idx][fieldId] = val;
+  wealthAnswersDirty = true;
+}
+function setPersonalInfoB(field, val){
+  wealthPersonalInfo[field] = val;
+  wealthAnswersDirty = true;
+  renderWealthQuestionnaire();
+}
+function addWealthChild(){
+  wealthPersonalInfo.children.push({name:'',id:'',birthDate:''});
+  wealthAnswersDirty = true;
+  renderWealthQuestionnaire();
+}
+function removeWealthChild(idx){
+  wealthPersonalInfo.children.splice(idx,1);
+  wealthAnswersDirty = true;
+  renderWealthQuestionnaire();
+}
+function updateWealthChild(idx, field, val){
+  wealthPersonalInfo.children[idx][field] = val;
+  wealthAnswersDirty = true;
+}
+function addWealthSubRow(parentField, columns){
+  wealthPersonalInfo[parentField] = wealthPersonalInfo[parentField] || [];
+  wealthPersonalInfo[parentField].push(emptyRowFor(columns));
+  wealthAnswersDirty = true;
+  renderWealthQuestionnaire();
+}
+function removeWealthSubRow(parentField, idx){
+  wealthPersonalInfo[parentField].splice(idx,1);
+  wealthAnswersDirty = true;
+  renderWealthQuestionnaire();
+}
+function updateWealthSubRow(parentField, idx, fieldId, val){
+  wealthPersonalInfo[parentField][idx][fieldId] = val;
+  wealthAnswersDirty = true;
+}
+
+// ── RENDER: generic table block, reused for every table-type section ──
+function renderWealthTableBlock(section, dis){
+  const ans = wealthAnswers[section.key] || {has_data:null, rows:[]};
+  const yes = ans.has_data === true, no = ans.has_data === false;
+  const missingDoc = yes && section.requiresDoc && !wealthSectionHasUpload(section.key);
+  const cols = section.hasOwner ? [{id:'owner',label:'שייך ל'}, ...section.columns] : section.columns;
+  return `<div class="card2" style="margin-bottom:8px;${section.isLiability?'border-right:3px solid var(--red)':''}">
+    <div style="display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap">
+      <div style="font-weight:600;font-size:13px">${section.icon} ${section.q}</div>
+      <div class="type-toggle no-print">
+        <button class="type-btn in${yes?' active':''}" ${dis} onclick="setWealthSectionAnswer('${section.key}',true,${JSON.stringify(section.columns).replace(/"/g,'&quot;')})">כן</button>
+        <button class="type-btn out${no?' active':''}" ${dis} onclick="setWealthSectionAnswer('${section.key}',false)">לא</button>
+      </div>
+    </div>
+    ${section.hint?`<div style="font-size:11px;color:var(--muted);margin-top:4px">💡 ${section.hint}</div>`:''}
+    ${yes ? `<div style="margin-top:8px;padding-top:8px;border-top:1px solid var(--border);overflow-x:auto">
+      <table class="tbl" style="min-width:${cols.length*110}px">
+        <thead><tr>${cols.map(c=>`<th>${c.label}</th>`).join('')}<th class="no-print"></th></tr></thead>
+        <tbody>${(ans.rows||[]).map((row,idx)=>`<tr>
+          ${section.hasOwner?`<td><select ${dis} onchange="updateWealthRow('${section.key}',${idx},'owner',this.value)" style="font-size:11px">
+            <option value="self" ${row.owner==='self'||!row.owner?'selected':''}>עצמי</option>
+            <option value="spouse" ${row.owner==='spouse'?'selected':''}>בן/בת זוג</option>
+            ${wealthPersonalInfo.children.map(c=>`<option value="child:${c.name}" ${row.owner==='child:'+c.name?'selected':''}>${c.name||'ילד/ה'}</option>`).join('')}
+          </select></td>`:''}
+          ${section.columns.map(c=>`<td><input type="${c.type||'text'}" value="${row[c.id]||''}" ${dis} style="font-size:11px;min-width:90px" onchange="updateWealthRow('${section.key}',${idx},'${c.id}',this.value)"></td>`).join('')}
+          <td class="no-print"><button class="btn btn-red btn-sm" ${dis} onclick="removeWealthRow('${section.key}',${idx})">✕</button></td>
+        </tr>`).join('')}</tbody>
+      </table>
+      <button class="btn btn-sm no-print" style="margin-top:6px" ${dis} onclick='addWealthRow("${section.key}",${JSON.stringify(section.columns)})'>+ הוסף שורה</button>
+      <button class="btn btn-sm no-print" style="margin-top:6px;border-color:var(--blue2);color:var(--blue2)" ${dis} onclick="startWealthUpload('${section.key}')">📎 צרף קובץ</button>
+      ${missingDoc?`<div style="font-size:11px;color:var(--red);margin-top:6px">⚠️ סומן "כן" אך לא צורף קובץ.</div>`:''}
+    </div>` : ''}
+  </div>`;
+}
+function renderWealthSimpleBlock(section, dis){
+  const ans = wealthAnswers[section.key] || {has_data:null};
+  const yes = ans.has_data === true, no = ans.has_data === false;
+  return `<div class="card2" style="margin-bottom:8px;${section.isLiability?'border-right:3px solid var(--red)':''}">
+    <div style="display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap">
+      <div style="font-weight:600;font-size:13px">${section.icon} ${section.q}</div>
+      <div class="type-toggle no-print">
+        <button class="type-btn in${yes?' active':''}" ${dis} onclick="setWealthSimpleAnswer('${section.key}',true)">כן</button>
+        <button class="type-btn out${no?' active':''}" ${dis} onclick="setWealthSimpleAnswer('${section.key}',false)">לא</button>
+      </div>
+    </div>
+    ${yes?`<div style="margin-top:8px"><input type="number" placeholder="0" value="${ans.value||''}" ${dis} onchange="setWealthSimpleValue('${section.key}',this.value)"></div>`:''}
+  </div>`;
+}
+function renderWealthEntityBlock(dis){
+  return `<div class="card">
+    <div class="sec-title">חלק ב׳ — עסקים/שותפויות/חברות שמתנהל בהם מאזן</div>
+    <div class="type-toggle no-print" style="margin-bottom:8px">
+      <button class="type-btn in${wealthPersonalInfo.hasBusinessWithBalance?' active':''}" ${dis} onclick="setPersonalInfoB('hasBusinessWithBalance',true)">כן</button>
+      <button class="type-btn out${wealthPersonalInfo.hasBusinessWithBalance===false?' active':''}" ${dis} onclick="setPersonalInfoB('hasBusinessWithBalance',false)">לא</button>
+    </div>
+    ${wealthPersonalInfo.hasBusinessWithBalance ? wealthEntities.map((ent,idx)=>`
+      <div class="card2" style="margin-bottom:8px;border-right:3px solid var(--blue2)">
+        <div style="display:flex;justify-content:space-between;margin-bottom:6px"><b style="font-size:12px">גוף מס' ${idx+1}</b>
+          <button class="btn btn-red btn-sm no-print" ${dis} onclick="removeWealthEntity(${idx})">הסר</button></div>
+        ${WEALTH_ENTITY_FIELDS.map(f=>`<div style="margin-bottom:5px"><div class="form-label">${f.label}</div>
+          <input type="${f.type||'text'}" value="${ent[f.id]||''}" ${dis} onchange="updateWealthEntity(${idx},'${f.id}',this.value)"></div>`).join('')}
+      </div>`).join('') + `<button class="btn-solid no-print" ${dis} onclick="addWealthEntity()">+ הוסף גוף</button>
+      <button class="btn btn-sm no-print" style="margin-top:6px;margin-right:6px;border-color:var(--blue2);color:var(--blue2)" ${dis} onclick="startWealthUpload('business_balance')">📎 צרף מאזן חתום</button>`
+    : ''}
+  </div>`;
+}
+function renderWealthPartCGate(dis){
+  const gateOpen = wealthPersonalInfo.hasBusinessNoBalance;
+  return `<div class="card">
+    <div class="sec-title">חלק ג׳ — רכוש והתחייבויות בעסק שאינו מנהל מאזן</div>
+    <div class="type-toggle no-print" style="margin-bottom:8px">
+      <button class="type-btn in${gateOpen?' active':''}" ${dis} onclick="setPersonalInfoB('hasBusinessNoBalance',true)">כן</button>
+      <button class="type-btn out${gateOpen===false?' active':''}" ${dis} onclick="setPersonalInfoB('hasBusinessNoBalance',false)">לא</button>
+    </div>
+    ${gateOpen ? WEALTH_SECTIONS_C.map(s=> s.type==='simple' ? renderWealthSimpleBlock(s,dis) : renderWealthTableBlock(s,dis)).join('') : ''}
+  </div>`;
+}
+function renderWealthPartD(dis){
+  const safeOpen = wealthPersonalInfo.hasSafe;
+  const poaOpen = wealthPersonalInfo.hasPoa;
+  const unownedOpen = wealthPersonalInfo.hasUnownedProperty;
+  const subRowsHtml = (parentField, rows)=> `<div style="overflow-x:auto;margin-top:6px"><table class="tbl"><thead><tr>${WEALTH_PART_D_TABLE.map(c=>`<th>${c.label}</th>`).join('')}<th class="no-print"></th></tr></thead>
+    <tbody>${(rows||[]).map((row,idx)=>`<tr>${WEALTH_PART_D_TABLE.map(c=>`<td><input type="${c.type||'text'}" value="${row[c.id]||''}" ${dis} style="font-size:11px" onchange="updateWealthSubRow('${parentField}',${idx},'${c.id}',this.value)"></td>`).join('')}
+      <td class="no-print"><button class="btn btn-red btn-sm" ${dis} onclick="removeWealthSubRow('${parentField}',${idx})">✕</button></td></tr>`).join('')}</tbody>
+    </table><button class="btn btn-sm no-print" style="margin-top:6px" ${dis} onclick='addWealthSubRow("${parentField}",${JSON.stringify(WEALTH_PART_D_TABLE)})'>+ הוסף שורה</button></div>`;
+  return `<div class="card"><div class="sec-title">חלק ד׳ — פרטים נוספים</div>
+
+    <div class="card2" style="margin-bottom:8px">
+      <div style="font-weight:600;font-size:13px">🔐 כספות (ברשותך/בשליטתך)</div>
+      <div class="type-toggle no-print" style="margin:6px 0">
+        <button class="type-btn in${safeOpen?' active':''}" ${dis} onclick="setPersonalInfoB('hasSafe',true)">כן</button>
+        <button class="type-btn out${safeOpen===false?' active':''}" ${dis} onclick="setPersonalInfoB('hasSafe',false)">לא</button>
+      </div>
+      ${safeOpen?`<div class="form-label">מיקום הכספת (בית/בנק וסניף/אחר)</div><input value="${wealthPersonalInfo.safeLocation||''}" ${dis} onchange="setPersonalInfoB('safeLocation',this.value)">
+        <div style="margin-top:8px;font-size:12px">הכספת מכילה רכוש שאינו בבעלותי:
+          <button class="btn btn-sm" ${dis} onclick="setPersonalInfoB('safeHasUnownedProperty',true)">כן</button>
+          <button class="btn btn-sm" ${dis} onclick="setPersonalInfoB('safeHasUnownedProperty',false)">לא</button>
+        </div>
+        ${wealthPersonalInfo.safeHasUnownedProperty?subRowsHtml('safeUnownedRows',wealthPersonalInfo.safeUnownedRows):''}`:''}
+    </div>
+
+    <div class="card2" style="margin-bottom:8px">
+      <div style="font-weight:600;font-size:13px">✍️ ייפוי כוח / נאמנות / אפוטרופוס על רכוש שאינו שלך</div>
+      <div class="type-toggle no-print" style="margin:6px 0">
+        <button class="type-btn in${poaOpen?' active':''}" ${dis} onclick="setPersonalInfoB('hasPoa',true)">כן</button>
+        <button class="type-btn out${poaOpen===false?' active':''}" ${dis} onclick="setPersonalInfoB('hasPoa',false)">לא</button>
+      </div>
+      ${poaOpen?subRowsHtml('poaRows',wealthPersonalInfo.poaRows):''}
+    </div>
+
+    <div class="card2" style="margin-bottom:8px">
+      <div style="font-weight:600;font-size:13px">📦 רכוש שמוחזק אצלך שלא בבעלותך (שלא דווח קודם)</div>
+      <div class="type-toggle no-print" style="margin:6px 0">
+        <button class="type-btn in${unownedOpen?' active':''}" ${dis} onclick="setPersonalInfoB('hasUnownedProperty',true)">כן</button>
+        <button class="type-btn out${unownedOpen===false?' active':''}" ${dis} onclick="setPersonalInfoB('hasUnownedProperty',false)">לא</button>
+      </div>
+      ${unownedOpen?subRowsHtml('unownedRows',wealthPersonalInfo.unownedRows):''}
+    </div>
+  </div>`;
+}
+
+async function loadWealthQuestionnaire(){
+  if(!sb || !currentUser || !currentWealthYear) return;
+  const [{data, error}, {data:statusRow}] = await Promise.all([
+    sb.from('tax_questionnaire').select('*').eq('client_email', currentUser.email).eq('tax_year', currentWealthYear).eq('declaration_type','wealth'),
+    sb.from('tax_year_status').select('locked,completed_notified_at').eq('client_email', currentUser.email).eq('tax_year', currentWealthYear).eq('declaration_type','wealth').maybeSingle()
+  ]);
+  wealthAnswers = {}; wealthEntities = [];
+  wealthPersonalInfo = {idNumber:'',birthDate:'',address:'',taxFileNumber:'',spouseBirthDate:'',sharedHousehold:false,
+    children:[],declarationDate:'',requestDate:'',isFirstDeclaration:'',prevNetWorth:'',prevDeclarationDate:'',
+    hasBusinessWithBalance:false,hasBusinessNoBalance:false,hasSafe:false,safeLocation:'',safeHasUnownedProperty:false,safeUnownedRows:[],
+    hasPoa:false,poaRows:[],hasUnownedProperty:false,unownedRows:[]};
+  if(!error && data) data.forEach(row=>{
+    if(row.section_key === 'personal_info'){
+      wealthPersonalInfo = {...wealthPersonalInfo, ...(row.details||{})};
+      wealthEntities = (row.details||{}).entities || [];
+    } else {
+      wealthAnswers[row.section_key] = {has_data:row.has_income, rows:(row.details||{}).rows, value:(row.details||{}).value};
+    }
+  });
+  wealthYearLocked = !!(statusRow && statusRow.locked);
+  wealthSentAt = statusRow?.completed_notified_at || null;
+  wealthAnswersDirty = false;
+  renderWealthQuestionnaire();
+}
+function renderWealthQuestionnaire(){
+  const wrap = el('wealth-questionnaire-body'); if(!wrap) return;
+  const dis = wealthYearLocked ? 'disabled style="opacity:.6"' : '';
+  const lockBanner = wealthYearLocked
+    ? `<div style="background:#f59e0b15;border:1px solid #f59e0b40;border-radius:8px;padding:10px 12px;margin-bottom:10px;font-size:12px;color:var(--yellow)">🔒 הצהרה זו נעולה — המשרד כבר בדק. לשינויים, פנה למשרד.</div>` : '';
+  const sentBanner = wealthSentAt
+    ? `<div style="background:#10b98115;border:1px solid #10b98140;border-radius:8px;padding:10px 12px;margin-bottom:10px;font-size:12px;color:var(--accent)">✅ נשלח למשרד בתאריך ${new Date(wealthSentAt).toLocaleDateString('he-IL')}. אפשר עדיין לעדכן ולשמור.</div>` : '';
+
+  const married = wealthPersonalInfo.sharedHousehold;
+  const personalBlock = `<div class="card">
+    <div class="sec-title">👤 פרטי המצהיר/ה</div>
+    <div class="form-grid" style="grid-template-columns:1fr 1fr">
+      <div><div class="form-label">מספר ת.ז</div><input value="${wealthPersonalInfo.idNumber||''}" ${dis} onchange="setPersonalInfoB('idNumber',this.value)"></div>
+      <div><div class="form-label">תאריך לידה</div><input type="date" value="${wealthPersonalInfo.birthDate||''}" ${dis} onchange="setPersonalInfoB('birthDate',this.value)"></div>
+    </div>
+    <div class="form-grid" style="grid-template-columns:1fr"><div><div class="form-label">כתובת מגורים מלאה</div><input value="${wealthPersonalInfo.address||''}" ${dis} onchange="setPersonalInfoB('address',this.value)"></div></div>
+    <div class="form-grid" style="grid-template-columns:1fr"><div><div class="form-label">מספר תיק במס הכנסה (אם קיים)</div><input value="${wealthPersonalInfo.taxFileNumber||''}" ${dis} onchange="setPersonalInfoB('taxFileNumber',this.value)"></div></div>
+
+    <div style="margin-top:8px;padding-top:8px;border-top:1px solid var(--border)">
+      <label style="display:flex;align-items:center;gap:6px;font-size:12px;cursor:pointer">
+        <input type="checkbox" ${married?'checked':''} ${dis} onchange="setPersonalInfoB('sharedHousehold',this.checked)">
+        אני ובן/בת זוגי נשואים ומנהלים משק בית משותף
+      </label>
+      ${married?`<div class="form-grid" style="grid-template-columns:1fr;margin-top:6px"><div><div class="form-label">תאריך לידה בן/בת הזוג</div><input type="date" value="${wealthPersonalInfo.spouseBirthDate||''}" ${dis} onchange="setPersonalInfoB('spouseBirthDate',this.value)"></div></div>`:''}
+    </div>
+
+    <div style="margin-top:8px;padding-top:8px;border-top:1px solid var(--border)">
+      <div class="form-label">ילדים מתחת לגיל 18</div>
+      ${wealthPersonalInfo.children.map((c,idx)=>`<div class="form-grid" style="grid-template-columns:1fr 1fr 1fr auto;align-items:end;margin-bottom:6px">
+        <div><input placeholder="שם" value="${c.name||''}" ${dis} onchange="updateWealthChild(${idx},'name',this.value)"></div>
+        <div><input placeholder="ת.ז" value="${c.id||''}" ${dis} onchange="updateWealthChild(${idx},'id',this.value)"></div>
+        <div><input type="date" value="${c.birthDate||''}" ${dis} onchange="updateWealthChild(${idx},'birthDate',this.value)"></div>
+        <button class="btn btn-red btn-sm no-print" ${dis} onclick="removeWealthChild(${idx})">✕</button>
+      </div>`).join('')}
+      <button class="btn btn-sm no-print" ${dis} onclick="addWealthChild()">+ הוסף ילד/ה</button>
+    </div>
+  </div>`;
+
+  const declBlock = `<div class="card">
+    <div class="sec-title">📅 פרטי ההצהרה</div>
+    <div class="form-grid" style="grid-template-columns:1fr 1fr">
+      <div><div class="form-label">תאריך אליו מתייחסת ההצהרה</div><input type="date" value="${wealthPersonalInfo.declarationDate||''}" ${dis} onchange="setPersonalInfoB('declarationDate',this.value)"></div>
+      <div><div class="form-label">תאריך הדרישה מרשות המסים</div><input type="date" value="${wealthPersonalInfo.requestDate||''}" ${dis} onchange="setPersonalInfoB('requestDate',this.value)"></div>
+    </div>
+    <div class="form-label">האם זו הצהרת הון ראשונה?</div>
+    <div class="type-toggle no-print" style="margin-bottom:8px">
+      <button class="type-btn in${wealthPersonalInfo.isFirstDeclaration===true?' active':''}" ${dis} onclick="setPersonalInfoB('isFirstDeclaration',true)">כן</button>
+      <button class="type-btn out${wealthPersonalInfo.isFirstDeclaration===false?' active':''}" ${dis} onclick="setPersonalInfoB('isFirstDeclaration',false)">לא</button>
+    </div>
+    ${wealthPersonalInfo.isFirstDeclaration===false?`<div class="form-grid" style="grid-template-columns:1fr 1fr">
+      <div><div class="form-label">הון נטו בהצהרה קודמת (₪)</div><input type="number" value="${wealthPersonalInfo.prevNetWorth||''}" ${dis} onchange="setPersonalInfoB('prevNetWorth',this.value)"></div>
+      <div><div class="form-label">תאריך ההצהרה הקודמת</div><input type="date" value="${wealthPersonalInfo.prevDeclarationDate||''}" ${dis} onchange="setPersonalInfoB('prevDeclarationDate',this.value)"></div>
+    </div>`:''}
+  </div>`;
+
+  const partALiabilities = WEALTH_SECTIONS_A.filter(s=>s.isLiability);
+  const partAAssets = WEALTH_SECTIONS_A.filter(s=>!s.isLiability);
+  const partAHtml = `<div class="card"><div class="sec-title">חלק א׳ — רכוש פרטי</div>${partAAssets.map(s=>renderWealthTableBlock(s,dis)).join('')}</div>
+    <div class="card"><div class="sec-title">חלק א׳ — התחייבויות פרטיות</div>${partALiabilities.map(s=>renderWealthTableBlock(s,dis)).join('')}</div>`;
+
+  wrap.innerHTML = lockBanner + sentBanner + personalBlock + declBlock + partAHtml
+    + renderWealthEntityBlock(dis) + renderWealthPartCGate(dis) + renderWealthPartD(dis)
+    + (wealthYearLocked ? '' : `
+      <div style="display:flex;gap:8px;margin-top:6px" class="no-print">
+        <button class="btn" id="wealth-save-btn" onclick="saveWealthQuestionnaire()" style="flex:1">💾 שמור</button>
+        <button class="btn-solid" id="wealth-send-btn" onclick="sendWealthToOffice()" style="flex:1">📤 שלח למשרד</button>
+      </div>
+      <div id="wealth-save-status" style="font-size:11px;color:var(--muted);text-align:center;margin-top:5px"></div>`);
+}
+
+async function persistWealthQuestionnaire(){
+  const allSections = [...WEALTH_SECTIONS_A, ...WEALTH_SECTIONS_C];
+  const rows = allSections.map(s=>{
+    const ans = wealthAnswers[s.key] || {has_data:null};
+    return { client_email: currentUser.email, tax_year: currentWealthYear, declaration_type:'wealth', section_key: s.key,
+      has_income: ans.has_data===undefined?null:ans.has_data, details: {rows: ans.rows||[], value: ans.value} };
+  });
+  rows.push({ client_email: currentUser.email, tax_year: currentWealthYear, declaration_type:'wealth', section_key:'personal_info',
+    has_income:null, details: {...wealthPersonalInfo, entities: wealthEntities} });
+  return await sb.from('tax_questionnaire').upsert(rows, {onConflict:'client_email,tax_year,section_key,declaration_type'});
+}
+async function saveWealthQuestionnaire(){
+  if(!sb || !currentUser || !currentWealthYear) return;
+  const btn = el('wealth-save-btn'); const status = el('wealth-save-status');
+  if(btn) btn.disabled = true;
+  const {error} = await persistWealthQuestionnaire();
+  wealthAnswersDirty = false;
+  if(btn) btn.disabled = false;
+  if(error){ if(status) status.textContent = 'שגיאה בשמירה, נסה שוב.'; return; }
+  if(status){ status.textContent = '✓ נשמר'; setTimeout(()=>{ if(status) status.textContent=''; }, 2500); }
+}
+async function sendWealthToOffice(){
+  if(!sb || !currentUser || !currentWealthYear) return;
+  const status = el('wealth-save-status');
+  const allSections = [...WEALTH_SECTIONS_A, ...WEALTH_SECTIONS_C];
+  const missingDocs = allSections.filter(s=>{
+    const a = wealthAnswers[s.key];
+    return a && a.has_data===true && s.requiresDoc && !wealthSectionHasUpload(s.key);
+  });
+  if(missingDocs.length){
+    if(!confirm(`חסרים קבצים לסעיפים: ${missingDocs.map(s=>s.key).join(', ')}\n\nלשלוח למשרד בכל זאת?`)) return;
+  }
+  const sendBtn = el('wealth-send-btn');
+  if(sendBtn){ sendBtn.disabled = true; sendBtn.textContent = 'שולח...'; }
+  const {error} = await persistWealthQuestionnaire();
+  wealthAnswersDirty = false;
+  if(error){
+    if(sendBtn){ sendBtn.disabled = false; sendBtn.textContent = '📤 שלח למשרד'; }
+    if(status) status.textContent = 'שגיאה בשמירה, נסה שוב.';
+    return;
+  }
+  await sb.rpc('notify_questionnaire_complete', {p_email:currentUser.email, p_year:currentWealthYear, p_type:'wealth'});
+  wealthSentAt = new Date().toISOString();
+  if(sendBtn){ sendBtn.disabled = false; sendBtn.textContent = '📤 שלח למשרד'; }
+  if(status) status.textContent = '✅ נשלח למשרד בהצלחה';
+  renderWealthQuestionnaire();
 }
 
 // ── ACCOUNTS ──
