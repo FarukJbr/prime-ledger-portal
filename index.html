@@ -1461,6 +1461,20 @@ async function doRegister(){
   if(!/^[0-9+\-\s]{7,15}$/.test(phone)){ err.textContent='טלפון לא תקין'; err.style.display='block'; return; }
   if(!sb){ err.textContent='שגיאת מערכת'; err.style.display='block'; return; }
 
+  // Block registration with a phone number already used by another profile
+  // (normalized, so "0555027988" and "+972555027988" are treated as the same
+  // number) — this prevents the WhatsApp receipt-bot from ever being unable
+  // to tell two clients apart by phone, which is the only way it identifies
+  // who is texting it.
+  try{
+    const {data: phoneTaken, error: phoneCheckErr} = await sb.rpc('is_phone_taken', {p_phone: phone});
+    if(!phoneCheckErr && phoneTaken){
+      err.textContent = 'מספר הטלפון הזה כבר רשום אצל משתמש אחר בפורטל. אם זה הטלפון שלך, פנה למשרד.';
+      err.style.display = 'block';
+      return;
+    }
+  }catch(e){ console.error('is_phone_taken check failed', e); }
+
   // Same defensive measure as doLogin() — clear any leftover session first.
   await sb.auth.signOut();
   const {data, error} = await sb.auth.signUp({email, password:pass});
@@ -1473,7 +1487,12 @@ async function doRegister(){
     id: data.user.id, full_name:name, phone, company_name:biz,
     role:'client', plan:'free', usage_type:usageEl.value, blocked:false
   });
-  if(profErr){ err.textContent='שגיאה ביצירת פרופיל: '+profErr.message; err.style.display='block'; return; }
+  if(profErr){
+    err.textContent = /idx_profiles_unique_normalized_phone|duplicate key/i.test(profErr.message)
+      ? 'מספר הטלפון הזה כבר רשום אצל משתמש אחר בפורטל. אם זה הטלפון שלך, פנה למשרד.'
+      : 'שגיאה ביצירת פרופיל: '+profErr.message;
+    err.style.display='block'; return;
+  }
   if(refCode) linkReferral(refCode, email);
   info.textContent='✅ ההרשמה הצליחה! ניתן להתחבר כעת מכל מכשיר.';
   info.style.display='block';
@@ -2429,7 +2448,12 @@ async function adminAddUser(){
   if(!name||!email||!pass){ alert('נא למלא שם, אימייל וסיסמה'); return; }
   if(pass.length<6){ alert('סיסמה חייבת לפחות 6 תווים'); return; }
   const {error} = await sb.rpc('admin_create_user',{p_email:email,p_password:pass,p_name:name,p_phone:phone,p_biz:biz,p_role:role,p_usage:usage,p_plan:plan});
-  if(error){ alert('שגיאה: '+error.message); return; }
+  if(error){
+    alert(/idx_profiles_unique_normalized_phone|duplicate key/i.test(error.message)
+      ? 'מספר הטלפון הזה כבר רשום אצל לקוח אחר בפורטל.'
+      : 'שגיאה: '+error.message);
+    return;
+  }
   ['adm-new-name','adm-new-biz','adm-new-email','adm-new-phone','adm-new-pass'].forEach(id=>document.getElementById(id).value='');
   await refreshUsersCache(); renderAdminPanel(); alert('✅ לקוח נוסף בהצלחה!');
 }
