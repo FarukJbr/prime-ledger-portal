@@ -81,6 +81,9 @@ body{background:var(--bg);color:var(--text);font-family:'Segoe UI','Noto Sans He
 #admin-subtabs-bar{background:var(--card);border:1px solid var(--border);border-radius:10px;padding:0 8px;display:flex;align-items:center;height:44px;gap:2px;overflow-x:auto;margin-bottom:12px}
 #admin-subtabs-bar::-webkit-scrollbar{display:none}
 .adm-subtab{display:none}.adm-subtab.active{display:block}
+#web-subtabs-bar{background:var(--card);border:1px solid var(--border);border-radius:10px;padding:0 8px;display:flex;align-items:center;height:44px;gap:2px;overflow-x:auto;margin-bottom:12px}
+#web-subtabs-bar::-webkit-scrollbar{display:none}
+.web-subtab{display:none}.web-subtab.active{display:block}
 .status-badge{display:inline-block;padding:3px 9px;border-radius:12px;font-size:10px;font-weight:700;white-space:nowrap}
 .status-not-started{background:#64748b20;color:var(--muted)}
 .status-in-progress{background:#f59e0b20;color:var(--yellow)}
@@ -802,6 +805,7 @@ h2{font-size:16px;font-weight:800;margin-bottom:4px}
           <button class="navbtn active" onclick="switchAdminSubTab('clients',this)">👥 לקוחות</button>
           <button class="navbtn" onclick="switchAdminSubTab('viewer',this)">👁️ צפייה בנתוני לקוח</button>
           <button class="navbtn" onclick="switchAdminSubTab('reports',this)">📊 דוחות שנתיים</button>
+          <button class="navbtn" onclick="switchAdminSubTab('website',this)">🌐 ניהול אתר</button>
         </div>
 
         <!-- ══ SUB-TAB: CLIENTS ══ -->
@@ -964,6 +968,76 @@ h2{font-size:16px;font-weight:800;margin-bottom:4px}
           <div id="adm-reports-list"><div style="color:var(--muted);font-size:12px;padding:10px">בחר שנה ולחץ "טען"</div></div>
         </div>
         </div><!-- /adm-sub-reports -->
+
+        <!-- ══ SUB-TAB: WEBSITE MANAGEMENT (primels.co.il content) ══ -->
+        <div id="adm-sub-website" class="adm-subtab">
+          <div id="web-subtabs-bar">
+            <button class="navbtn active" onclick="switchWebSubTab('leads',this)">📨 פניות מהאתר</button>
+            <button class="navbtn" onclick="switchWebSubTab('settings',this)">⚙️ הגדרות כלליות</button>
+            <button class="navbtn" onclick="switchWebSubTab('services',this)">🧩 שירותים</button>
+            <button class="navbtn" onclick="switchWebSubTab('tiers',this)">💳 מחירון</button>
+            <button class="navbtn" onclick="switchWebSubTab('addons',this)">➕ תוספים</button>
+            <button class="navbtn" onclick="switchWebSubTab('forms',this)">📄 טפסים</button>
+          </div>
+
+          <!-- LEADS -->
+          <div id="web-sub-leads" class="web-subtab active">
+            <div class="card no-print">
+              <div class="sec-title">📨 פניות שהתקבלו מטופס "צור קשר" באתר <span id="web-leads-count" style="color:var(--muted);font-size:11px"></span></div>
+              <div class="acct-bar no-print" style="margin-bottom:10px">
+                <button class="acct-chip all active" onclick="setLeadsFilter('all',this)">הכל</button>
+                <button class="acct-chip" onclick="setLeadsFilter('new',this)">🆕 חדש</button>
+                <button class="acct-chip" onclick="setLeadsFilter('in_progress',this)">✏️ בטיפול</button>
+                <button class="acct-chip" onclick="setLeadsFilter('done',this)">✅ טופל</button>
+              </div>
+              <div id="web-leads-list"><div style="color:var(--muted);font-size:12px;padding:10px">טוען...</div></div>
+            </div>
+          </div>
+
+          <!-- SETTINGS -->
+          <div id="web-sub-settings" class="web-subtab">
+            <div class="card no-print">
+              <div class="sec-title">⚙️ הגדרות כלליות של האתר</div>
+              <div id="web-settings-form"><div style="color:var(--muted);font-size:12px;padding:10px">טוען...</div></div>
+            </div>
+          </div>
+
+          <!-- SERVICES -->
+          <div id="web-sub-services" class="web-subtab">
+            <div class="card no-print">
+              <div class="sec-title">🧩 שירותים <span id="web-services-count" style="color:var(--muted);font-size:11px"></span></div>
+              <button class="btn-solid" onclick="addWebService()" style="margin-bottom:10px">+ הוסף שירות</button>
+              <div id="web-services-list"><div style="color:var(--muted);font-size:12px;padding:10px">טוען...</div></div>
+            </div>
+          </div>
+
+          <!-- TIERS -->
+          <div id="web-sub-tiers" class="web-subtab">
+            <div class="card no-print">
+              <div class="sec-title">💳 חבילות מחיר (מחירון האתר) <span id="web-tiers-count" style="color:var(--muted);font-size:11px"></span></div>
+              <button class="btn-solid" onclick="addWebTier()" style="margin-bottom:10px">+ הוסף חבילה</button>
+              <div id="web-tiers-list"><div style="color:var(--muted);font-size:12px;padding:10px">טוען...</div></div>
+            </div>
+          </div>
+
+          <!-- ADDONS -->
+          <div id="web-sub-addons" class="web-subtab">
+            <div class="card no-print">
+              <div class="sec-title">➕ תוספים <span id="web-addons-count" style="color:var(--muted);font-size:11px"></span></div>
+              <button class="btn-solid" onclick="addWebAddon()" style="margin-bottom:10px">+ הוסף תוסף</button>
+              <div id="web-addons-list"><div style="color:var(--muted);font-size:12px;padding:10px">טוען...</div></div>
+            </div>
+          </div>
+
+          <!-- FORMS -->
+          <div id="web-sub-forms" class="web-subtab">
+            <div class="card no-print">
+              <div class="sec-title">📄 קטגוריות טפסים להורדה <span id="web-forms-count" style="color:var(--muted);font-size:11px"></span></div>
+              <button class="btn-solid" onclick="addWebFormCat()" style="margin-bottom:10px">+ הוסף קטגוריה</button>
+              <div id="web-forms-list"><div style="color:var(--muted);font-size:12px;padding:10px">טוען...</div></div>
+            </div>
+          </div>
+        </div><!-- /adm-sub-website -->
 
       </div>
 
@@ -1493,10 +1567,14 @@ async function doRegister(){
     err.style.display='block'; return;
   }
   if(!data?.user){ err.textContent='שגיאת רישום'; err.style.display='block'; return; }
-  const {error:profErr} = await sb.from('profiles').insert({
+  // upsert (not insert): a DB trigger shared with the marketing site
+  // (primels.co.il) may have ALREADY created a placeholder profile row for
+  // this same auth user the instant signUp() succeeded — upsert overwrites
+  // it with the real form data instead of failing on a duplicate key.
+  const {error:profErr} = await sb.from('profiles').upsert({
     id: data.user.id, full_name:name, phone, company_name:biz,
     role:'client', plan:'free', usage_type:usageEl.value, blocked:false
-  });
+  }, {onConflict:'id'});
   if(profErr){
     err.textContent = /idx_profiles_unique_normalized_phone|duplicate key/i.test(profErr.message)
       ? 'מספר הטלפון הזה כבר רשום אצל משתמש אחר בפורטל. אם זה הטלפון שלך, פנה למשרד.'
@@ -1911,6 +1989,316 @@ function switchAdminSubTab(name, btn){
   document.querySelectorAll('#ptab-admin .adm-subtab').forEach(p=>p.classList.remove('active'));
   if(btn) btn.classList.add('active');
   const panel = el('adm-sub-'+name); if(panel) panel.classList.add('active');
+  if(name==='website') loadWebLeads();
+}
+
+// ════════════════════════════════════════════════════════════════
+// WEBSITE MANAGEMENT (primels.co.il content) — admin only.
+// Uses the SAME `sb` client/session already authenticated for the portal —
+// no second login, because as of the unification migration the marketing
+// site's content tables (site_*) live in this exact same Supabase project.
+// ════════════════════════════════════════════════════════════════
+function switchWebSubTab(name, btn){
+  document.querySelectorAll('#web-subtabs-bar .navbtn').forEach(b=>b.classList.remove('active'));
+  document.querySelectorAll('#adm-sub-website .web-subtab').forEach(p=>p.classList.remove('active'));
+  if(btn) btn.classList.add('active');
+  const panel = el('web-sub-'+name); if(panel) panel.classList.add('active');
+  if(name==='settings') loadWebSettings();
+  if(name==='services') loadWebServices();
+  if(name==='tiers') loadWebTiers();
+  if(name==='addons') loadWebAddons();
+  if(name==='forms') loadWebForms();
+}
+
+// ── LEADS ──
+let webLeadsData = [], webLeadsFilter = 'all';
+function setLeadsFilter(f, btn){
+  webLeadsFilter = f;
+  document.querySelectorAll('#web-sub-leads .acct-chip').forEach(c=>c.classList.remove('active'));
+  if(btn) btn.classList.add('active');
+  renderWebLeadsList();
+}
+async function loadWebLeads(){
+  const {data, error} = await sb.from('site_leads').select('*').order('created_at',{ascending:false});
+  if(error){ el('web-leads-list').innerHTML = `<div style="color:var(--red);font-size:12px">שגיאה: ${error.message}</div>`; return; }
+  webLeadsData = data || [];
+  renderWebLeadsList();
+}
+function renderWebLeadsList(){
+  const list = el('web-leads-list'); if(!list) return;
+  const filtered = webLeadsFilter==='all' ? webLeadsData : webLeadsData.filter(l=>(l.status||'new')===webLeadsFilter);
+  el('web-leads-count').textContent = `${filtered.length} מתוך ${webLeadsData.length}`;
+  if(!filtered.length){ list.innerHTML = '<div style="color:var(--muted);font-size:12px;padding:10px">אין פניות בסטטוס זה</div>'; return; }
+  const statusLabel = {new:'🆕 חדש', in_progress:'✏️ בטיפול', done:'✅ טופל'};
+  list.innerHTML = filtered.map(l=>`<div class="card2" style="margin-bottom:8px">
+    <div style="display:flex;justify-content:space-between;flex-wrap:wrap;gap:6px">
+      <div>
+        <div style="font-weight:700;font-size:13px">${l.full_name||'(ללא שם)'} ${l.business?`· ${l.business}`:''}</div>
+        <div style="font-size:11px;color:var(--muted)">${l.email||''} ${l.phone?'· '+l.phone:''} ${l.topic?'· '+l.topic:''}</div>
+        <div style="font-size:11px;color:var(--muted);margin-top:2px">${new Date(l.created_at).toLocaleString('he-IL')}</div>
+      </div>
+      <select onchange="webLeadSetStatus('${l.id}',this.value)" style="width:auto;font-size:11px">
+        <option value="new" ${l.status==='new'?'selected':''}>🆕 חדש</option>
+        <option value="in_progress" ${l.status==='in_progress'?'selected':''}>✏️ בטיפול</option>
+        <option value="done" ${l.status==='done'?'selected':''}>✅ טופל</option>
+      </select>
+    </div>
+    ${l.message?`<div style="font-size:12px;margin-top:6px;padding-top:6px;border-top:1px solid var(--border)">${l.message}</div>`:''}
+  </div>`).join('');
+}
+async function webLeadSetStatus(id, status){
+  const {error} = await sb.from('site_leads').update({status}).eq('id', id);
+  if(error){ alert('שגיאה: '+error.message); return; }
+  await loadWebLeads();
+}
+
+// ── SETTINGS (singleton row) ──
+async function loadWebSettings(){
+  const {data, error} = await sb.from('site_settings').select('*').eq('id',1).maybeSingle();
+  if(error){ el('web-settings-form').innerHTML = `<div style="color:var(--red);font-size:12px">שגיאה: ${error.message}</div>`; return; }
+  const s = data || {};
+  const f = (id,label,val)=>`<div style="margin-bottom:8px"><div class="form-label">${label}</div><input id="${id}" value="${(val||'').toString().replace(/"/g,'&quot;')}"></div>`;
+  el('web-settings-form').innerHTML =
+    f('ws-brand','שם המותג', s.brand_name) +
+    f('ws-tagline','תיאור קצר (טאגליין)', s.tagline) +
+    f('ws-phone-sales','טלפון מכירות', s.phone_sales) +
+    f('ws-phone-support','טלפון תמיכה', s.phone_support) +
+    f('ws-email','אימייל', s.email) +
+    f('ws-address','כתובת', s.address) +
+    f('ws-hours','שעות פעילות', s.hours) +
+    `<button class="btn-solid" onclick="saveWebSettings()">💾 שמור הגדרות</button>
+     <span id="ws-save-status" style="font-size:11px;color:var(--accent);margin-right:8px"></span>`;
+}
+async function saveWebSettings(){
+  const patch = {
+    brand_name: el('ws-brand').value, tagline: el('ws-tagline').value,
+    phone_sales: el('ws-phone-sales').value, phone_support: el('ws-phone-support').value,
+    email: el('ws-email').value, address: el('ws-address').value, hours: el('ws-hours').value,
+    updated_at: new Date().toISOString()
+  };
+  const {error} = await sb.from('site_settings').update(patch).eq('id',1);
+  const status = el('ws-save-status');
+  if(error){ status.style.color='var(--red)'; status.textContent='שגיאה: '+error.message; return; }
+  status.style.color='var(--accent)'; status.textContent='✓ נשמר';
+  setTimeout(()=>{ if(status) status.textContent=''; }, 2500);
+}
+
+// ── GENERIC HELPERS for JSON-array fields (features/files) ──
+function jsonTextarea(id, label, arr, hint){
+  let text; try{ text = JSON.stringify(arr||[], null, 0); }catch(e){ text='[]'; }
+  return `<div style="margin-bottom:8px"><div class="form-label">${label} ${hint?`<span style="color:var(--muted)">— ${hint}</span>`:''}</div>
+    <textarea id="${id}" rows="3" style="width:100%;font-family:monospace;font-size:11px;background:var(--surface);border:1px solid var(--border);border-radius:6px;color:var(--text);padding:8px">${text.replace(/</g,'&lt;')}</textarea></div>`;
+}
+function parseJsonField(id, fallback){
+  try{ return JSON.parse(el(id).value); }catch(e){ alert('שגיאת פורמט JSON בשדה — בדוק שהתחביר תקין.'); throw e; }
+}
+
+// ── SERVICES ──
+let webServicesData = [];
+async function loadWebServices(){
+  const {data, error} = await sb.from('site_services').select('*').order('sort_order');
+  if(error){ el('web-services-list').innerHTML = `<div style="color:var(--red);font-size:12px">שגיאה: ${error.message}</div>`; return; }
+  webServicesData = data || [];
+  renderWebServicesList();
+}
+function renderWebServicesList(){
+  el('web-services-count').textContent = webServicesData.length+' שירותים';
+  el('web-services-list').innerHTML = webServicesData.map((s,i)=>`<div class="card2" style="margin-bottom:10px">
+    <div class="form-grid" style="grid-template-columns:1fr 1fr">
+      <div><div class="form-label">כותרת</div><input id="svc-title-${i}" value="${(s.title||'').replace(/"/g,'&quot;')}"></div>
+      <div><div class="form-label">אייקון (lucide)</div><input id="svc-icon-${i}" value="${(s.icon||'').replace(/"/g,'&quot;')}"></div>
+    </div>
+    <div style="margin-bottom:8px"><div class="form-label">תיאור קצר</div><input id="svc-short-${i}" value="${(s.short||'').replace(/"/g,'&quot;')}"></div>
+    <div style="margin-bottom:8px"><div class="form-label">תיאור מלא</div><input id="svc-desc-${i}" value="${(s.description||'').replace(/"/g,'&quot;')}"></div>
+    ${jsonTextarea('svc-feat-'+i,'נקודות (רשימת מחרוזות)', s.features, 'לדוגמה: ["נקודה 1","נקודה 2"]')}
+    <div style="display:flex;gap:8px;align-items:center">
+      <label style="display:flex;align-items:center;gap:4px;font-size:12px"><input type="checkbox" id="svc-vis-${i}" ${s.visible?'checked':''}> מוצג באתר</label>
+      <input type="number" id="svc-sort-${i}" value="${s.sort_order||0}" style="width:70px" title="סדר הצגה">
+      <button class="btn btn-sm" onclick="saveWebService(${i})">💾 שמור</button>
+      <button class="btn btn-red btn-sm" onclick="deleteWebService('${s.id}')">מחק</button>
+    </div>
+  </div>`).join('') || '<div style="color:var(--muted);font-size:12px;padding:10px">אין שירותים עדיין</div>';
+}
+async function addWebService(){
+  const id = 'svc-'+Date.now();
+  const {error} = await sb.from('site_services').insert({id, title:'שירות חדש', sort_order:webServicesData.length});
+  if(error){ alert('שגיאה: '+error.message); return; }
+  await loadWebServices();
+}
+async function saveWebService(i){
+  const s = webServicesData[i];
+  let features; try{ features = parseJsonField('svc-feat-'+i); }catch(e){ return; }
+  const patch = {
+    title: el('svc-title-'+i).value, icon: el('svc-icon-'+i).value,
+    short: el('svc-short-'+i).value, description: el('svc-desc-'+i).value,
+    features, visible: el('svc-vis-'+i).checked, sort_order: parseInt(el('svc-sort-'+i).value)||0,
+    updated_at: new Date().toISOString()
+  };
+  const {error} = await sb.from('site_services').update(patch).eq('id', s.id);
+  if(error){ alert('שגיאה: '+error.message); return; }
+  await loadWebServices();
+}
+async function deleteWebService(id){
+  if(!confirm('למחוק שירות זה?')) return;
+  const {error} = await sb.from('site_services').delete().eq('id', id);
+  if(error){ alert('שגיאה: '+error.message); return; }
+  await loadWebServices();
+}
+
+// ── TIERS (pricing) ──
+let webTiersData = [];
+async function loadWebTiers(){
+  const {data, error} = await sb.from('site_tiers').select('*').order('sort_order');
+  if(error){ el('web-tiers-list').innerHTML = `<div style="color:var(--red);font-size:12px">שגיאה: ${error.message}</div>`; return; }
+  webTiersData = data || [];
+  renderWebTiersList();
+}
+function renderWebTiersList(){
+  el('web-tiers-count').textContent = webTiersData.length+' חבילות';
+  el('web-tiers-list').innerHTML = webTiersData.map((t,i)=>`<div class="card2" style="margin-bottom:10px;${t.popular?'border-right:3px solid var(--accent)':''}">
+    <div class="form-grid" style="grid-template-columns:1fr 1fr">
+      <div><div class="form-label">שם החבילה</div><input id="tier-name-${i}" value="${(t.name||'').replace(/"/g,'&quot;')}"></div>
+      <div><div class="form-label">תיאור</div><input id="tier-desc-${i}" value="${(t.description||'').replace(/"/g,'&quot;')}"></div>
+    </div>
+    <div class="form-grid" style="grid-template-columns:1fr 1fr">
+      <div><div class="form-label">מחיר חודשי (₪)</div><input type="number" id="tier-pm-${i}" value="${t.price_month||0}"></div>
+      <div><div class="form-label">מחיר שנתי (₪)</div><input type="number" id="tier-py-${i}" value="${t.price_year||0}"></div>
+    </div>
+    ${jsonTextarea('tier-feat-'+i,'מאפיינים (זוגות [תיאור, כן/לא])', t.features, 'לדוגמה: [["דוח שנתי",true],["חשבות שכר",false]]')}
+    <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
+      <label style="display:flex;align-items:center;gap:4px;font-size:12px"><input type="checkbox" id="tier-vis-${i}" ${t.visible?'checked':''}> מוצג באתר</label>
+      <label style="display:flex;align-items:center;gap:4px;font-size:12px"><input type="checkbox" id="tier-pop-${i}" ${t.popular?'checked':''}> מומלץ ⭐</label>
+      <input type="number" id="tier-sort-${i}" value="${t.sort_order||0}" style="width:70px" title="סדר הצגה">
+      <button class="btn btn-sm" onclick="saveWebTier(${i})">💾 שמור</button>
+      <button class="btn btn-red btn-sm" onclick="deleteWebTier('${t.id}')">מחק</button>
+    </div>
+  </div>`).join('') || '<div style="color:var(--muted);font-size:12px;padding:10px">אין חבילות עדיין</div>';
+}
+async function addWebTier(){
+  const id = 'tier-'+Date.now();
+  const {error} = await sb.from('site_tiers').insert({id, name:'חבילה חדשה', sort_order:webTiersData.length});
+  if(error){ alert('שגיאה: '+error.message); return; }
+  await loadWebTiers();
+}
+async function saveWebTier(i){
+  const t = webTiersData[i];
+  let features; try{ features = parseJsonField('tier-feat-'+i); }catch(e){ return; }
+  const patch = {
+    name: el('tier-name-'+i).value, description: el('tier-desc-'+i).value,
+    price_month: parseFloat(el('tier-pm-'+i).value)||0, price_year: parseFloat(el('tier-py-'+i).value)||0,
+    features, visible: el('tier-vis-'+i).checked, popular: el('tier-pop-'+i).checked,
+    sort_order: parseInt(el('tier-sort-'+i).value)||0, updated_at: new Date().toISOString()
+  };
+  const {error} = await sb.from('site_tiers').update(patch).eq('id', t.id);
+  if(error){ alert('שגיאה: '+error.message); return; }
+  await loadWebTiers();
+}
+async function deleteWebTier(id){
+  if(!confirm('למחוק חבילה זו?')) return;
+  const {error} = await sb.from('site_tiers').delete().eq('id', id);
+  if(error){ alert('שגיאה: '+error.message); return; }
+  await loadWebTiers();
+}
+
+// ── ADDONS ──
+let webAddonsData = [];
+async function loadWebAddons(){
+  const {data, error} = await sb.from('site_addons').select('*').order('sort_order');
+  if(error){ el('web-addons-list').innerHTML = `<div style="color:var(--red);font-size:12px">שגיאה: ${error.message}</div>`; return; }
+  webAddonsData = data || [];
+  renderWebAddonsList();
+}
+function renderWebAddonsList(){
+  el('web-addons-count').textContent = webAddonsData.length+' תוספים';
+  el('web-addons-list').innerHTML = webAddonsData.map((a,i)=>`<div class="card2" style="margin-bottom:10px">
+    <div class="form-grid" style="grid-template-columns:1fr 1fr">
+      <div><div class="form-label">כותרת</div><input id="add-title-${i}" value="${(a.title||'').replace(/"/g,'&quot;')}"></div>
+      <div><div class="form-label">אייקון (lucide)</div><input id="add-icon-${i}" value="${(a.icon||'').replace(/"/g,'&quot;')}"></div>
+    </div>
+    <div class="form-grid" style="grid-template-columns:1fr 1fr">
+      <div><div class="form-label">תיאור</div><input id="add-desc-${i}" value="${(a.description||'').replace(/"/g,'&quot;')}"></div>
+      <div><div class="form-label">תווית מחיר</div><input id="add-price-${i}" value="${(a.price_label||'').replace(/"/g,'&quot;')}"></div>
+    </div>
+    <div style="display:flex;gap:8px;align-items:center">
+      <label style="display:flex;align-items:center;gap:4px;font-size:12px"><input type="checkbox" id="add-vis-${i}" ${a.visible?'checked':''}> מוצג באתר</label>
+      <input type="number" id="add-sort-${i}" value="${a.sort_order||0}" style="width:70px" title="סדר הצגה">
+      <button class="btn btn-sm" onclick="saveWebAddon(${i})">💾 שמור</button>
+      <button class="btn btn-red btn-sm" onclick="deleteWebAddon('${a.id}')">מחק</button>
+    </div>
+  </div>`).join('') || '<div style="color:var(--muted);font-size:12px;padding:10px">אין תוספים עדיין</div>';
+}
+async function addWebAddon(){
+  const id = 'addon-'+Date.now();
+  const {error} = await sb.from('site_addons').insert({id, title:'תוסף חדש', sort_order:webAddonsData.length});
+  if(error){ alert('שגיאה: '+error.message); return; }
+  await loadWebAddons();
+}
+async function saveWebAddon(i){
+  const a = webAddonsData[i];
+  const patch = {
+    title: el('add-title-'+i).value, icon: el('add-icon-'+i).value,
+    description: el('add-desc-'+i).value, price_label: el('add-price-'+i).value,
+    visible: el('add-vis-'+i).checked, sort_order: parseInt(el('add-sort-'+i).value)||0,
+    updated_at: new Date().toISOString()
+  };
+  const {error} = await sb.from('site_addons').update(patch).eq('id', a.id);
+  if(error){ alert('שגיאה: '+error.message); return; }
+  await loadWebAddons();
+}
+async function deleteWebAddon(id){
+  if(!confirm('למחוק תוסף זה?')) return;
+  const {error} = await sb.from('site_addons').delete().eq('id', id);
+  if(error){ alert('שגיאה: '+error.message); return; }
+  await loadWebAddons();
+}
+
+// ── FORMS (download categories) ──
+let webFormsData = [];
+async function loadWebForms(){
+  const {data, error} = await sb.from('site_forms').select('*').order('sort_order');
+  if(error){ el('web-forms-list').innerHTML = `<div style="color:var(--red);font-size:12px">שגיאה: ${error.message}</div>`; return; }
+  webFormsData = data || [];
+  renderWebFormsList();
+}
+function renderWebFormsList(){
+  el('web-forms-count').textContent = webFormsData.length+' קטגוריות';
+  el('web-forms-list').innerHTML = webFormsData.map((f,i)=>`<div class="card2" style="margin-bottom:10px">
+    <div class="form-grid" style="grid-template-columns:1fr 1fr">
+      <div><div class="form-label">שם הקטגוריה</div><input id="frm-cat-${i}" value="${(f.category||'').replace(/"/g,'&quot;')}"></div>
+      <div><div class="form-label">אייקון (lucide)</div><input id="frm-icon-${i}" value="${(f.icon||'').replace(/"/g,'&quot;')}"></div>
+    </div>
+    ${jsonTextarea('frm-files-'+i,'קבצים (שלשות [שם, גודל, סוג])', f.files, 'לדוגמה: [["טופס X","PDF · 200KB","pdf"]]')}
+    <div style="display:flex;gap:8px;align-items:center">
+      <label style="display:flex;align-items:center;gap:4px;font-size:12px"><input type="checkbox" id="frm-vis-${i}" ${f.visible?'checked':''}> מוצג באתר</label>
+      <input type="number" id="frm-sort-${i}" value="${f.sort_order||0}" style="width:70px" title="סדר הצגה">
+      <button class="btn btn-sm" onclick="saveWebFormCat(${i})">💾 שמור</button>
+      <button class="btn btn-red btn-sm" onclick="deleteWebFormCat('${f.id}')">מחק</button>
+    </div>
+  </div>`).join('') || '<div style="color:var(--muted);font-size:12px;padding:10px">אין קטגוריות עדיין</div>';
+}
+async function addWebFormCat(){
+  const id = 'fc-'+Date.now();
+  const {error} = await sb.from('site_forms').insert({id, category:'קטגוריה חדשה', sort_order:webFormsData.length});
+  if(error){ alert('שגיאה: '+error.message); return; }
+  await loadWebForms();
+}
+async function saveWebFormCat(i){
+  const f = webFormsData[i];
+  let files; try{ files = parseJsonField('frm-files-'+i); }catch(e){ return; }
+  const patch = {
+    category: el('frm-cat-'+i).value, icon: el('frm-icon-'+i).value, files,
+    visible: el('frm-vis-'+i).checked, sort_order: parseInt(el('frm-sort-'+i).value)||0,
+    updated_at: new Date().toISOString()
+  };
+  const {error} = await sb.from('site_forms').update(patch).eq('id', f.id);
+  if(error){ alert('שגיאה: '+error.message); return; }
+  await loadWebForms();
+}
+async function deleteWebFormCat(id){
+  if(!confirm('למחוק קטגוריה זו?')) return;
+  const {error} = await sb.from('site_forms').delete().eq('id', id);
+  if(error){ alert('שגיאה: '+error.message); return; }
+  await loadWebForms();
 }
 
 // Admin-only read-only snapshot of a specific client's accounts + recent
