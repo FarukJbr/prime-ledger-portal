@@ -746,15 +746,25 @@ h2{font-size:16px;font-weight:800;margin-bottom:4px}
 
           <!-- CASHFLOW -->
           <div id="tab-cashflow" class="tab-panel">
-            <h2>תזרים מזומנים</h2><p class="subtitle">שבועי וחודשי</p>
+            <h2>תזרים מזומנים</h2><p class="subtitle">יומי, שבועי, חודשי — או טווח תאריכים לפי בחירה</p>
             <div style="display:flex;gap:7px;flex-wrap:wrap;margin-bottom:10px;align-items:center" class="no-print">
               <div class="period-bar" style="margin:0">
+                <button class="period-btn" onclick="setCFPeriod('day',this)">יומי</button>
                 <button class="period-btn active" onclick="setCFPeriod('week',this)">שבועי</button>
                 <button class="period-btn" onclick="setCFPeriod('month',this)">חודשי</button>
               </div>
               <select id="cf-acct" onchange="renderCF()" style="width:auto;font-size:12px;padding:4px 7px"><option value="all">כל החשבונות</option></select>
               <select id="cf-bp" onchange="renderCF()" style="width:auto;font-size:12px;padding:4px 7px"><option value="all">עסקי+פרטי</option><option value="biz">עסקי</option><option value="priv">פרטי</option></select>
               <button class="btn btn-sm" id="cf-forecast-toggle" style="border-color:#8b5cf6;color:#8b5cf6" onclick="toggleForecast()">🔮 הצג תחזית עתידית</button>
+            </div>
+            <div style="display:flex;gap:7px;flex-wrap:wrap;margin-bottom:10px;align-items:center" class="no-print">
+              <span style="font-size:11px;color:var(--muted)">סינון לפי תאריך:</span>
+              <button class="period-btn" onclick="setCFQuickRange('today')">היום</button>
+              <button class="period-btn" onclick="setCFQuickRange('yesterday')">אתמול</button>
+              <input type="date" id="cf-date-from" style="width:auto;font-size:12px;padding:4px 7px" onchange="applyCFDateRange()">
+              <span style="color:var(--muted);font-size:12px">עד</span>
+              <input type="date" id="cf-date-to" style="width:auto;font-size:12px;padding:4px 7px" onchange="applyCFDateRange()">
+              <button class="btn btn-sm btn-red" id="cf-date-clear" style="display:none" onclick="clearCFDateRange()">✕ נקה סינון</button>
             </div>
             <div id="cf-forecast-note" style="display:none;color:var(--muted);font-size:11px;margin-bottom:8px">🔮 התקופות המסומנות הן תחזית המבוססת על ההכנסות/הוצאות הקבועות שהגדרת — לא נתונים בפועל.</div>
             <div class="print-bar">
@@ -4219,14 +4229,45 @@ function renderUploadHistory(){
 }
 
 // ── CASHFLOW ──
-function setCFPeriod(p,btn){cfPeriod=p;document.querySelectorAll("#tab-cashflow .period-btn").forEach(b=>b.classList.remove("active"));btn.classList.add("active");renderCF();}
+function setCFPeriod(p,btn){cfPeriod=p;document.querySelectorAll("#tab-cashflow .period-btn").forEach(b=>b.classList.remove("active"));if(btn)btn.classList.add("active");renderCF();}
+let cfDateFrom=null, cfDateTo=null;
+// Quick chips just fill the two date inputs and switch to daily granularity —
+// reuses the exact same applyCFDateRange() path a manual range would use, so
+// there's only one code path to test/maintain for date-range filtering.
+function setCFQuickRange(which){
+  const today=new Date(); const d=new Date(today);
+  if(which==='yesterday') d.setDate(d.getDate()-1);
+  const iso=d.toISOString().slice(0,10);
+  if(el('cf-date-from')) el('cf-date-from').value=iso;
+  if(el('cf-date-to')) el('cf-date-to').value=iso;
+  cfPeriod='day';
+  document.querySelectorAll("#tab-cashflow .period-bar .period-btn").forEach(b=>b.classList.remove("active"));
+  applyCFDateRange();
+}
+function applyCFDateRange(){
+  const from=el('cf-date-from')?el('cf-date-from').value:'';
+  const to=el('cf-date-to')?el('cf-date-to').value:'';
+  cfDateFrom = from||null; cfDateTo = to||null;
+  if(el('cf-date-clear')) el('cf-date-clear').style.display=(cfDateFrom||cfDateTo)?'inline-block':'none';
+  updateLabels(); renderCF();
+}
+function clearCFDateRange(){
+  cfDateFrom=null; cfDateTo=null;
+  if(el('cf-date-from')) el('cf-date-from').value='';
+  if(el('cf-date-to')) el('cf-date-to').value='';
+  if(el('cf-date-clear')) el('cf-date-clear').style.display='none';
+  updateLabels(); renderCF();
+}
 function getPK(d,p){
   const dt=new Date(d); if(isNaN(dt)) return null;
+  if(p==="day") return dt.toISOString().slice(0,10);
   if(p==="month") return`${dt.getFullYear()}-${String(dt.getMonth()+1).padStart(2,"0")}`;
   const j=new Date(dt.getFullYear(),0,1); const w=Math.ceil(((dt-j)/86400000+j.getDay()+1)/7);
   return`${dt.getFullYear()}-W${String(w).padStart(2,"0")}`;
 }
-function getPL(k,p){ if(p==="month"){const[y,m]=k.split("-");return`${MONTHS[parseInt(m)-1]} ${y}`;} const[y,w]=k.split("-W");return`שב' ${w}/${y}`;}
+function getPL(k,p){
+  if(p==="day"){ const [y,m,d]=k.split("-"); return `${d}/${m}`; }
+  if(p==="month"){const[y,m]=k.split("-");return`${MONTHS[parseInt(m)-1]} ${y}`;} const[y,w]=k.split("-W");return`שב' ${w}/${y}`;}
 let showForecast = false;
 function toggleForecast(){
   showForecast = !showForecast;
@@ -4266,10 +4307,23 @@ function buildForecastPeriods(bf, p, count){
   }
   return periods;
 }
-function buildCFMap(af,bf,p){
+function buildCFMap(af,bf,p,dateRange){
   const map={};
+  // dateRange is OPTIONAL and explicit — only the cashflow tab itself passes
+  // {from, to} (read from cfDateFrom/cfDateTo). Other callers (dashboard mini
+  // table, full-portal Excel export) deliberately omit it so a date filter
+  // set on the cashflow tab can never silently affect unrelated views.
+  const from = dateRange?.from, to = dateRange?.to;
+  const inRange=(d)=>{
+    if(!from && !to) return true;
+    const iso = (d instanceof Date ? d.toISOString() : String(d)).slice(0,10);
+    if(from && iso < from) return false;
+    if(to && iso > to) return false;
+    return true;
+  };
   const add=(d,deb,cre,bp,ai)=>{
     if(af&&af!=="all"&&ai!==af) return; if(bf&&bf!=="all"&&bp!==bf) return;
+    if(!inRange(d)) return;
     const k=getPK(d instanceof Date?d.toISOString():d,p); if(!k) return;
     if(!map[k]) map[k]={k,label:getPL(k,p),bizInc:0,bizExp:0,privInc:0,privExp:0};
     const m=map[k], b=bp==="biz";
@@ -4283,11 +4337,12 @@ function renderCF(){
   const af=el("cf-acct")?el("cf-acct").value:"all", bf=el("cf-bp")?el("cf-bp").value:"all";
   const usage=currentUser?currentUser.usage||'biz':'biz';
   const effectiveBf=(usage==='priv'&&bf==='all')?'priv':bf;
-  const cf=buildCFMap(af,effectiveBf,cfPeriod);
-  if(showForecast && recurringItems.some(r=>r.active)){
+  const hasDateFilter = !!(cfDateFrom || cfDateTo);
+  const cf=buildCFMap(af,effectiveBf,cfPeriod,{from:cfDateFrom,to:cfDateTo});
+  if(showForecast && !hasDateFilter && recurringItems.some(r=>r.active)){
     cf.push(...buildForecastPeriods(effectiveBf, cfPeriod, cfPeriod==='month'?6:8));
   }
-  if(el("cf-forecast-note")) el("cf-forecast-note").style.display = showForecast ? "block" : "none";
+  if(el("cf-forecast-note")) el("cf-forecast-note").style.display = (showForecast && !hasDateFilter) ? "block" : "none";
   if(!cf.length){if(el("cf-empty"))el("cf-empty").style.display="block";if(el("cf-content"))el("cf-content").style.display="none";return;}
   if(el("cf-empty"))el("cf-empty").style.display="none"; if(el("cf-content"))el("cf-content").style.display="block";
   const maxV=Math.max(...cf.map(r=>Math.max(r.bizInc+r.privInc,r.bizExp+r.privExp)),1);
@@ -4385,7 +4440,8 @@ function refreshDashboard(){
 function updateLabels(){
   if(el("dash-client-lbl")) el("dash-client-lbl").textContent="מצב פיננסי עדכני"+(clientName?" | "+clientName:"");
   if(el("ph-client")) el("ph-client").textContent=clientName?"לקוח: "+clientName:"";
-  if(el("ph-date")) el("ph-date").textContent="תאריך הפקה: "+new Date().toLocaleDateString("he-IL");
+  const rangeNote = (cfDateFrom||cfDateTo) ? ` | טווח: ${cfDateFrom||"—"} עד ${cfDateTo||"—"}` : "";
+  if(el("ph-date")) el("ph-date").textContent="תאריך הפקה: "+new Date().toLocaleDateString("he-IL")+rangeNote;
   const lg=userLogoCache;
   const pl=el('print-logo'); if(pl&&lg) pl.src=lg;
 }
@@ -4421,10 +4477,12 @@ function exportCFExcel(){
   if(!hasFeature('excel')){ openUpgradeModal('ייצוא לאקסל כלול במנוי המקצועי בלבד.'); return; }
   const wb=XLSX.utils.book_new(); const ob=accounts.reduce((s,a)=>s+a.opening,0); let cum=ob;
   const cfA=el("cf-acct")?el("cf-acct").value:"all", cfB=el("cf-bp")?el("cf-bp").value:"all";
-  const d=[...getHdr(),["תקופה","הכנסות עסקי","הוצאות עסקי","רווח עסקי","הכנסות פרטי","הוצאות פרטי","מאזן פרטי","נטו כולל","יתרה"],
-    ...buildCFMap(cfA,cfB,cfPeriod).map(row=>{const net=(row.bizInc+row.privInc)-(row.bizExp+row.privExp);cum+=net;return[row.label,row.bizInc,row.bizExp,row.bizInc-row.bizExp,row.privInc,row.privExp,row.privInc-row.privExp,net,cum];})];
+  const rangeLbl = (cfDateFrom||cfDateTo) ? [["טווח תאריכים: "+(cfDateFrom||"—")+" עד "+(cfDateTo||"—")]] : [];
+  const d=[...getHdr(),...rangeLbl,["תקופה","הכנסות עסקי","הוצאות עסקי","רווח עסקי","הכנסות פרטי","הוצאות פרטי","מאזן פרטי","נטו כולל","יתרה"],
+    ...buildCFMap(cfA,cfB,cfPeriod,{from:cfDateFrom,to:cfDateTo}).map(row=>{const net=(row.bizInc+row.privInc)-(row.bizExp+row.privExp);cum+=net;return[row.label,row.bizInc,row.bizExp,row.bizInc-row.bizExp,row.privInc,row.privExp,row.privInc-row.privExp,net,cum];})];
   XLSX.utils.book_append_sheet(wb,XLSX.utils.aoa_to_sheet(d),"תזרים");
-  XLSX.writeFile(wb,"תזרים_"+new Date().toLocaleDateString("he-IL").replace(/\//g,"-")+".xlsx");
+  const fnameSuffix = (cfDateFrom||cfDateTo) ? `_${cfDateFrom||"התחלה"}_עד_${cfDateTo||"היום"}` : "";
+  XLSX.writeFile(wb,"תזרים"+fnameSuffix+"_"+new Date().toLocaleDateString("he-IL").replace(/\//g,"-")+".xlsx");
 }
 
 // ── SYNC & REFRESH ──
