@@ -944,6 +944,11 @@ h2{font-size:16px;font-weight:800;margin-bottom:4px}
 
         <!-- ══ SUB-TAB: ANNUAL REPORTS ══ -->
         <div id="adm-sub-reports" class="adm-subtab">
+        <div class="card no-print" style="border-color:#f59e0b50">
+          <div class="sec-title" style="color:var(--yellow)">💰 בקשות פתיחת שנה הממתינות לאישור תשלום <span id="adm-year-requests-count" style="color:var(--muted);font-size:11px"></span></div>
+          <p class="subtitle" style="margin-top:-4px">לקוח שלח בקשה לפתיח שנה (דוח שנתי/הצהרת הון). אשר רק אחרי שהתשלום התקבל.</p>
+          <div id="adm-year-requests-list"><div style="color:var(--muted);font-size:12px;padding:10px">טוען...</div></div>
+        </div>
         <div class="card no-print">
           <div class="sec-title">📊 מעקב דוחות שנתיים והצהרות הון</div>
           <p class="subtitle" style="margin-top:-4px">מי מילא, מי שלח, מי נעול — לכל הלקוחות בבת אחת.</p>
@@ -1265,9 +1270,10 @@ h2{font-size:16px;font-weight:800;margin-bottom:4px}
         <div id="files-year-view">
           <div class="card no-print">
             <div class="sec-title">תיקיות (שנות מס)</div>
+            <p class="subtitle" style="margin-top:-4px">פתיחת שנה דורשת אישור תשלום מהמשרד. שולח/ת בקשה — נעדכן ברגע שהיא אושרה.</p>
             <div style="display:flex;gap:8px;margin-bottom:10px">
               <input id="new-tax-year" type="number" placeholder="2026" style="max-width:120px">
-              <button class="btn-solid" onclick="createTaxYearFolder()" style="white-space:nowrap">+ תיקייה חדשה</button>
+              <button class="btn-solid" onclick="requestTaxYearOpen()" style="white-space:nowrap">📤 שלח בקשה לפתיחת שנה</button>
             </div>
           </div>
           <div id="tax-years-list"><div class="card" style="text-align:center;color:var(--muted);padding:24px">טוען...</div></div>
@@ -1299,9 +1305,10 @@ h2{font-size:16px;font-weight:800;margin-bottom:4px}
         <div id="wealth-year-view">
           <div class="card no-print">
             <div class="sec-title">תיקיות (שנות הצהרה)</div>
+            <p class="subtitle" style="margin-top:-4px">פתיחת שנה דורשת אישור תשלום מהמשרד.</p>
             <div style="display:flex;gap:8px;margin-bottom:10px">
               <input id="new-wealth-year" type="number" placeholder="2026" style="max-width:120px">
-              <button class="btn-solid" onclick="createWealthYearFolder()" style="white-space:nowrap">+ תיקייה חדשה</button>
+              <button class="btn-solid" onclick="requestWealthYearOpen()" style="white-space:nowrap">📤 שלח בקשה לפתיחת שנה</button>
             </div>
           </div>
           <div id="wealth-years-list"><div class="card" style="text-align:center;color:var(--muted);padding:24px">טוען...</div></div>
@@ -1947,6 +1954,50 @@ function setReportsFilter(filter, btn){
   if(btn) btn.classList.add('active');
   renderAdminTaxReportsList();
 }
+
+// ── ADMIN: pending year-open requests (payment-gated annual report / wealth folders) ──
+async function loadAdminYearRequests(){
+  const list = el('adm-year-requests-list'); if(!list) return;
+  const {data, error} = await sb.from('tax_year_open_requests').select('*').eq('status','pending').order('requested_at',{ascending:true});
+  if(error){ list.innerHTML = `<div style="color:var(--red);font-size:12px">שגיאה: ${error.message}</div>`; return; }
+  const users = getUsers();
+  el('adm-year-requests-count').textContent = (data||[]).length+' ממתינות';
+  if(!data || !data.length){ list.innerHTML = '<div style="color:var(--muted);font-size:12px;padding:10px">אין בקשות ממתינות כרגע</div>'; return; }
+  list.innerHTML = data.map(r=>{
+    const u = users[r.client_email];
+    return `<div class="card2" style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px">
+      <div>
+        <div style="font-weight:700;font-size:13px">${u?u.name:r.client_email}${u&&u.biz?' · '+u.biz:''}</div>
+        <div style="font-size:11px;color:var(--muted)">${r.client_email} · נשלח ${new Date(r.requested_at).toLocaleString('he-IL')}</div>
+        <div style="font-size:12px;margin-top:3px"><b>שנה ${r.tax_year}</b> · ${r.declaration_type==='wealth'?'🏛️ הצהרת הון':'📊 דוח שנתי'}</div>
+      </div>
+      <div style="display:flex;gap:6px">
+        <button class="btn btn-sm" style="border-color:var(--accent);color:var(--accent)" onclick="adminApproveYearRequest('${r.id}','${r.client_email}','${r.tax_year}','${r.declaration_type}')">✅ אשר (שולם)</button>
+        <button class="btn btn-red btn-sm" onclick="adminRejectYearRequest('${r.id}')">✕ דחה</button>
+      </div>
+    </div>`;
+  }).join('');
+}
+async function adminApproveYearRequest(id, clientEmail, year, type){
+  if(!confirm(`לאשר פתיחת שנה ${year} ל-${clientEmail}? ודא שהתשלום התקבל קודם.`)) return;
+  const note = prompt('הערה (אופציונלי) — לדוגמה: שולם בהעברה בנקאית') || '';
+  const {error} = await sb.rpc('admin_decide_year_request', {p_request_id:id, p_approve:true, p_note:note});
+  if(error){ alert('שגיאה: '+error.message); return; }
+  // Also create the real storage folder right now, using the admin's own
+  // session — admin storage policies already allow writing into ANY
+  // client's folder, so the year is genuinely open and ready immediately.
+  const prefix = type==='wealth' ? WEALTH_BUCKET_PREFIX : '';
+  try{ await sb.storage.from(TAX_BUCKET).upload(`${clientEmail}/${prefix}${year}/.placeholder`, new Blob(['']), {upsert:true}); }catch(e){ console.error('folder create error', e); }
+  await loadAdminYearRequests();
+}
+async function adminRejectYearRequest(id){
+  if(!confirm('לדחות את הבקשה?')) return;
+  const note = prompt('סיבת הדחייה (אופציונלי, יישלח ללקוח)') || '';
+  const {error} = await sb.rpc('admin_decide_year_request', {p_request_id:id, p_approve:false, p_note:note});
+  if(error){ alert('שגיאה: '+error.message); return; }
+  await loadAdminYearRequests();
+}
+
 async function loadAdminTaxReports(){
   const year = el('adm-reports-year').value.trim();
   const type = el('adm-reports-type').value;
@@ -1990,6 +2041,7 @@ function switchAdminSubTab(name, btn){
   if(btn) btn.classList.add('active');
   const panel = el('adm-sub-'+name); if(panel) panel.classList.add('active');
   if(name==='website') loadWebLeads();
+  if(name==='reports') loadAdminYearRequests();
 }
 
 // ════════════════════════════════════════════════════════════════
@@ -3313,14 +3365,46 @@ const TAX_BUCKET = 'tax-documents';
 function taxBasePath(){ return currentUser ? currentUser.email : ''; }
 async function loadTaxYears(){
   const wrap = el('tax-years-list'); if(!wrap || !sb || !currentUser) return;
-  const {data, error} = await sb.storage.from(TAX_BUCKET).list(taxBasePath());
-  if(error){ wrap.innerHTML = `<div class="card" style="color:var(--red)">שגיאה בטעינת התיקיות: ${error.message}</div>`; return; }
-  const years = (data||[]).filter(d=>d.id===null && !d.name.startsWith(WEALTH_BUCKET_PREFIX)).map(d=>d.name).sort((a,b)=>b-a);
-  if(!years.length){ wrap.innerHTML = '<div class="card" style="text-align:center;color:var(--muted);padding:24px">אין תיקיות עדיין — הוסף שנת מס</div>'; return; }
-  wrap.innerHTML = years.map(y=>`<div class="card" style="display:flex;justify-content:space-between;align-items:center;cursor:pointer" onclick="openTaxYearFolder('${y}')">
-    <div style="display:flex;align-items:center;gap:10px"><span style="font-size:22px">📁</span><span style="font-weight:700">שנת מס ${y}</span></div>
-    <button class="btn btn-red btn-sm no-print" onclick="event.stopPropagation();deleteTaxYearFolder('${y}')">מחק תיקייה</button>
-  </div>`).join("");
+  const [{data: folderData, error: folderErr}, {data: reqData}] = await Promise.all([
+    sb.storage.from(TAX_BUCKET).list(taxBasePath()),
+    sb.from('tax_year_open_requests').select('*').eq('client_email', currentUser.email).eq('declaration_type','annual_report')
+  ]);
+  if(folderErr){ wrap.innerHTML = `<div class="card" style="color:var(--red)">שגיאה בטעינת התיקיות: ${folderErr.message}</div>`; return; }
+  const openYears = new Set((folderData||[]).filter(d=>d.id===null && !d.name.startsWith(WEALTH_BUCKET_PREFIX)).map(d=>d.name));
+  // Years that already have a real storage folder are "grandfathered" open
+  // regardless of the request table — this covers every year created before
+  // the approval-gate existed, so nothing already in progress gets hidden.
+  const items = [...openYears].map(y=>({year:y, state:'open'}));
+  (reqData||[]).forEach(r=>{ if(!openYears.has(r.tax_year)) items.push({year:r.tax_year, state:r.status}); });
+  items.sort((a,b)=>b.year.localeCompare(a.year));
+  if(!items.length){ wrap.innerHTML = '<div class="card" style="text-align:center;color:var(--muted);padding:24px">אין שנים עדיין — שלח בקשה לפתיחת שנה</div>'; return; }
+  wrap.innerHTML = items.map(it=>{
+    if(it.state==='open') return `<div class="card" style="display:flex;justify-content:space-between;align-items:center;cursor:pointer" onclick="openTaxYearFolder('${it.year}')">
+      <div style="display:flex;align-items:center;gap:10px"><span style="font-size:22px">📁</span><span style="font-weight:700">שנת מס ${it.year}</span></div>
+      <button class="btn btn-red btn-sm no-print" onclick="event.stopPropagation();deleteTaxYearFolder('${it.year}')">מחק תיקייה</button>
+    </div>`;
+    const badge = it.state==='pending'
+      ? '<span class="status-badge status-in-progress">⏳ ממתין לאישור תשלום</span>'
+      : '<span class="status-badge" style="background:#ef444420;color:var(--red)">❌ הבקשה נדחתה</span>';
+    return `<div class="card" style="display:flex;justify-content:space-between;align-items:center;opacity:.8">
+      <div style="display:flex;align-items:center;gap:10px"><span style="font-size:22px">📁</span><span style="font-weight:700">שנת מס ${it.year}</span></div>
+      ${badge}
+    </div>`;
+  }).join("");
+}
+// Replaces the old self-service createTaxYearFolder(): a client can no
+// longer open a tax year directly — they request it, the office collects
+// payment, and only admin approval (admin_decide_year_request) actually
+// opens it. See the matching card in the admin panel's "דוחות שנתיים" tab.
+async function requestTaxYearOpen(){
+  const year = el('new-tax-year').value.trim();
+  if(!year || !/^\d{4}$/.test(year)){ alert('נא להזין שנה תקינה (לדוגמה 2026)'); return; }
+  if(!sb || !currentUser) return;
+  const {error} = await sb.rpc('request_tax_year_open', {p_tax_year:year, p_declaration_type:'annual_report'});
+  if(error){ alert('שגיאה: '+error.message); return; }
+  el('new-tax-year').value='';
+  alert('הבקשה נשלחה למשרד! לאחר אישור התשלום השנה תיפתח אצלך אוטומטית.');
+  loadTaxYears();
 }
 async function createTaxYearFolder(){
   const year = el('new-tax-year').value.trim();
@@ -3786,15 +3870,41 @@ function wealthSectionHasUpload(key){
 // ── FOLDER MANAGEMENT (mirrors createTaxYearFolder/openTaxYearFolder exactly,
 // just pointed at "wealth-{year}" paths in the same bucket) ──
 async function loadWealthYears(){
-  const wrap = el('wealth-years-list'); if(!wrap) return;
-  const {data, error} = await sb.storage.from(TAX_BUCKET).list(taxBasePath());
-  if(error){ wrap.innerHTML = `<div class="card" style="color:var(--red)">שגיאה: ${error.message}</div>`; return; }
-  const years = (data||[]).filter(d=>d.id===null && d.name.startsWith(WEALTH_BUCKET_PREFIX)).map(d=>d.name.slice(WEALTH_BUCKET_PREFIX.length));
-  if(!years.length){ wrap.innerHTML = '<div class="card" style="text-align:center;color:var(--muted);padding:24px">אין תיקיות עדיין</div>'; return; }
-  wrap.innerHTML = years.map(y=>`<div class="card2" style="display:flex;justify-content:space-between;align-items:center">
-    <button class="btn" style="flex:1;text-align:right" onclick="openWealthYearFolder('${y}')">📁 שנה ${y}</button>
-    <button class="btn btn-red btn-sm no-print" onclick="deleteWealthYearFolder('${y}')">מחק</button>
-  </div>`).join('');
+  const wrap = el('wealth-years-list'); if(!wrap || !currentUser) return;
+  const [{data: folderData, error: folderErr}, {data: reqData}] = await Promise.all([
+    sb.storage.from(TAX_BUCKET).list(taxBasePath()),
+    sb.from('tax_year_open_requests').select('*').eq('client_email', currentUser.email).eq('declaration_type','wealth')
+  ]);
+  if(folderErr){ wrap.innerHTML = `<div class="card" style="color:var(--red)">שגיאה: ${folderErr.message}</div>`; return; }
+  const openYears = new Set((folderData||[]).filter(d=>d.id===null && d.name.startsWith(WEALTH_BUCKET_PREFIX)).map(d=>d.name.slice(WEALTH_BUCKET_PREFIX.length)));
+  const items = [...openYears].map(y=>({year:y, state:'open'}));
+  (reqData||[]).forEach(r=>{ if(!openYears.has(r.tax_year)) items.push({year:r.tax_year, state:r.status}); });
+  items.sort((a,b)=>b.year.localeCompare(a.year));
+  if(!items.length){ wrap.innerHTML = '<div class="card" style="text-align:center;color:var(--muted);padding:24px">אין תיקיות עדיין</div>'; return; }
+  wrap.innerHTML = items.map(it=>{
+    if(it.state==='open') return `<div class="card2" style="display:flex;justify-content:space-between;align-items:center">
+      <button class="btn" style="flex:1;text-align:right" onclick="openWealthYearFolder('${it.year}')">📁 שנה ${it.year}</button>
+      <button class="btn btn-red btn-sm no-print" onclick="deleteWealthYearFolder('${it.year}')">מחק</button>
+    </div>`;
+    const badge = it.state==='pending'
+      ? '<span class="status-badge status-in-progress">⏳ ממתין לאישור תשלום</span>'
+      : '<span class="status-badge" style="background:#ef444420;color:var(--red)">❌ הבקשה נדחתה</span>';
+    return `<div class="card2" style="display:flex;justify-content:space-between;align-items:center;opacity:.8">
+      <span>📁 שנה ${it.year}</span>${badge}
+    </div>`;
+  }).join('');
+}
+// Replaces self-service createWealthYearFolder() — see requestTaxYearOpen()
+// for the matching annual-report version; same approval-gate mechanism.
+async function requestWealthYearOpen(){
+  const year = el('new-wealth-year').value.trim();
+  if(!year){ alert('נא להזין שנה'); return; }
+  if(!sb || !currentUser) return;
+  const {error} = await sb.rpc('request_tax_year_open', {p_tax_year:year, p_declaration_type:'wealth'});
+  if(error){ alert('שגיאה: '+error.message); return; }
+  el('new-wealth-year').value = '';
+  alert('הבקשה נשלחה למשרד! לאחר אישור התשלום השנה תיפתח אצלך אוטומטית.');
+  loadWealthYears();
 }
 async function createWealthYearFolder(){
   const year = el('new-wealth-year').value.trim();
