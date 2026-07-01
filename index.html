@@ -805,7 +805,7 @@ h2{font-size:16px;font-weight:800;margin-bottom:4px}
           <button class="navbtn active" onclick="switchAdminSubTab('clients',this)">👥 לקוחות</button>
           <button class="navbtn" onclick="switchAdminSubTab('viewer',this)">👁️ צפייה בנתוני לקוח</button>
           <button class="navbtn" onclick="switchAdminSubTab('reports',this)">📊 דוחות שנתיים</button>
-          <button class="navbtn" onclick="switchAdminSubTab('website',this)">🌐 ניהול אתר</button>
+          ${hasPermission('manage_website') ? `<button class="navbtn" onclick="switchAdminSubTab('website',this)">🌐 ניהול אתר</button>` : ''}
         </div>
 
         <!-- ══ SUB-TAB: CLIENTS ══ -->
@@ -880,9 +880,23 @@ h2{font-size:16px;font-weight:800;margin-bottom:4px}
           </div>
           <div class="form-grid" style="grid-template-columns:1fr 1fr 1fr 1fr;align-items:end">
             <div><div class="form-label">סיסמה</div><input id="adm-new-pass" placeholder="סיסמה123"></div>
-            <div><div class="form-label">הרשאה</div><select id="adm-new-role"><option value="user">👤 משתמש</option><option value="admin">👑 מנהל</option></select></div>
+            <div><div class="form-label">הרשאה</div>
+              <select id="adm-new-role" onchange="toggleStaffRoleField()">
+                <option value="client">👤 לקוח</option>
+                <option value="admin">👑 צוות / מנהל</option>
+              </select>
+            </div>
             <div><div class="form-label">מנוי</div><select id="adm-new-plan"></select></div>
             <div><div class="form-label">סוג</div><select id="adm-new-usage"><option value="biz">🏢 עסקי</option><option value="priv">🏠 פרטי</option></select></div>
+          </div>
+          <div id="adm-new-staffrole-wrap" style="display:none;margin-top:6px">
+            <div class="form-label">תפקיד בצוות</div>
+            <select id="adm-new-staffrole">
+              <option value="full_admin">👑 מנהל מלא — כל ההרשאות</option>
+              <option value="bookkeeping">💰 הנהלת חשבונות — אישור תשלומים בלבד</option>
+              <option value="supervisor">🔍 אחראי/מפקח — צפייה ונעילת דוחות</option>
+              <option value="customer_service">🎧 שירות לקוחות — צפייה בלבד</option>
+            </select>
           </div>
           <button class="btn-solid" onclick="adminAddUser()" style="margin-top:6px">+ הוסף לקוח</button>
         </div>
@@ -1457,7 +1471,27 @@ function mapAdminRow(u){
     usage:u.usage_type||'biz', role:u.role||'client', plan:u.plan||'free',
     blocked:!!u.blocked, upgradeRequested:!!u.upgrade_requested,
     upgradeRequestedAt:u.upgrade_requested_at, logoData:u.logo_data, createdAt:u.created_at,
-    planExpiresAt:u.plan_expires_at||null};
+    planExpiresAt:u.plan_expires_at||null,
+    staffRole:u.staff_role||null, permissions:u.permissions||{}};
+}
+
+// ── PERMISSION HELPERS (client-side mirror of DB has_permission()) ──
+// currentUser.permissions is loaded from profiles after login.
+// full_admin always passes, regardless of which specific flag is asked for.
+function hasPermission(perm){
+  if(!currentUser || currentUser.role!=='admin') return false;
+  const p = currentUser.permissions||{};
+  return !!(p.full_admin || p[perm]);
+}
+const STAFF_ROLE_LABELS = {
+  full_admin:'👑 מנהל מלא', bookkeeping:'💰 הנהלת חשבונות',
+  supervisor:'🔍 אחראי/מפקח', customer_service:'🎧 שירות לקוחות'
+};
+function staffRoleLabel(role){ return STAFF_ROLE_LABELS[role] || role; }
+
+function toggleStaffRoleField(){
+  const isAdmin = (el('adm-new-role')?.value||'') === 'admin';
+  if(el('adm-new-staffrole-wrap')) el('adm-new-staffrole-wrap').style.display = isAdmin ? 'block' : 'none';
 }
 async function refreshUsersCache(){
   if(!sb) return usersCache;
@@ -1528,7 +1562,8 @@ async function doLogin(){
     name: profile.full_name||'', biz: profile.company_name||'', phone: profile.phone||'',
     role: profile.role||'client', plan: profile.plan||'free', usage: profile.usage_type||'biz',
     blocked: !!profile.blocked, upgradeRequested: !!profile.upgrade_requested,
-    upgradeRequestedAt: profile.upgrade_requested_at
+    upgradeRequestedAt: profile.upgrade_requested_at,
+    staffRole: profile.staff_role||null, permissions: profile.permissions||{}
   };
   enterPortal();
 }
@@ -1621,7 +1656,8 @@ async function tryRestoreSession(){
     name: profile.full_name||'', biz: profile.company_name||'', phone: profile.phone||'',
     role: profile.role||'client', plan: profile.plan||'free', usage: profile.usage_type||'biz',
     blocked: !!profile.blocked, upgradeRequested: !!profile.upgrade_requested,
-    upgradeRequestedAt: profile.upgrade_requested_at
+    upgradeRequestedAt: profile.upgrade_requested_at,
+    staffRole: profile.staff_role||null, permissions: profile.permissions||{}
   };
   enterPortal();
 }
@@ -2030,7 +2066,7 @@ function renderAdminTaxReportsList(){
         <span class="status-badge ${statusClass[status]}">${statusLabel[status]}</span>
         ${r.locked
           ? `<button class="btn btn-sm" onclick="setTaxYearLock('${r.client_email}','${year}',false,'${type}')">🔓 שחרר</button>`
-          : `<button class="btn btn-sm" style="border-color:var(--yellow);color:var(--yellow)" onclick="setTaxYearLock('${r.client_email}','${year}',true,'${type}')">🔒 נעל</button>`}
+          : hasPermission('manage_reports') ? `<button class="btn btn-sm" style="border-color:var(--yellow);color:var(--yellow)" onclick="setTaxYearLock('${r.client_email}','${year}',true,'${type}')">🔒 נעל</button>` : ''}
       </div>
     </div>`;
   }).join('');
@@ -2785,7 +2821,8 @@ function renderAdminPanel(){
           <div class="user-meta">${email}${u.phone?' · '+u.phone:''}</div>
           <div class="user-meta">${u.biz||'—'} · ${usageLbl[u.usage||'biz']} · נרשם: ${u.createdAt?new Date(u.createdAt).toLocaleDateString('he-IL'):'-'}</div>
           <div class="user-badges" style="margin-top:5px">
-            <span class="sbadge ${isAdm?'sb-admin':'sb-user'}">${isAdm?'👑 מנהל':'👤 משתמש'}</span>
+            <span class="sbadge ${isAdm?'sb-admin':'sb-user'}">${isAdm?'👑 צוות':'👤 לקוח'}</span>
+            ${isAdm && u.staffRole ? `<span class="sbadge" style="background:#8b5cf620;color:#8b5cf6;border:1px solid #8b5cf640">${staffRoleLabel(u.staffRole)}</span>` : ''}
             <span class="sbadge ${u.plan==='pro'?'sb-pro':'sb-free'}">${plan.icon} ${plan.name}</span>
             <span class="sbadge ${u.blocked?'sb-blocked':'sb-active'}">${u.blocked?'🚫 חסום':'✅ פעיל'}</span>
             ${u.upgradeRequested?'<span class="sbadge" style="background:#f59e0b20;color:#f59e0b">🔔 ממתין לשדרוג</span>':''}
@@ -2793,9 +2830,10 @@ function renderAdminPanel(){
         </div>
       </div>
       <div class="user-actions">
-        <button class="btn btn-sm" onclick="openEditUser('${email}')">✏️ ערוך</button>
-        <button class="btn btn-sm ${u.blocked?'btn-blue':'btn-red'}" onclick="adminToggleBlock('${email}')">${u.blocked?'🔓 שחרר':'🚫 חסום'}</button>
-        <button class="btn btn-sm btn-red" onclick="adminDeleteUser('${email}')">🗑️ מחק</button>
+        ${hasPermission('edit_clients') ? `<button class="btn btn-sm" onclick="openEditUser('${email}')">✏️ ערוך</button>` : ''}
+        ${isAdm && hasPermission('full_admin') ? `<button class="btn btn-sm" style="border-color:#8b5cf6;color:#8b5cf6" onclick="openEditStaffRole('${email}')">🛡️ תפקיד</button>` : ''}
+        ${hasPermission('edit_clients') ? `<button class="btn btn-sm ${u.blocked?'btn-blue':'btn-red'}" onclick="adminToggleBlock('${email}')">${u.blocked?'🔓 שחרר':'🚫 חסום'}</button>` : ''}
+        ${hasPermission('full_admin') ? `<button class="btn btn-sm btn-red" onclick="adminDeleteUser('${email}')">🗑️ מחק</button>` : ''}
       </div>
     </div>`;
   }).join('');
@@ -2895,17 +2933,47 @@ async function adminAddUser(){
   const role=document.getElementById('adm-new-role').value;
   const plan=document.getElementById('adm-new-plan').value;
   const usage=document.getElementById('adm-new-usage').value;
+  const staffRole = role==='admin' ? (el('adm-new-staffrole')?.value||'customer_service') : null;
   if(!name||!email||!pass){ alert('נא למלא שם, אימייל וסיסמה'); return; }
   if(pass.length<6){ alert('סיסמה חייבת לפחות 6 תווים'); return; }
-  const {error} = await sb.rpc('admin_create_user',{p_email:email,p_password:pass,p_name:name,p_phone:phone,p_biz:biz,p_role:role,p_usage:usage,p_plan:plan});
+  const {data: newId, error} = await sb.rpc('admin_create_user',{p_email:email,p_password:pass,p_name:name,p_phone:phone,p_biz:biz,p_role:role,p_usage:usage,p_plan:plan});
   if(error){
     alert(/idx_profiles_unique_normalized_phone|duplicate key/i.test(error.message)
       ? 'מספר הטלפון הזה כבר רשום אצל לקוח אחר בפורטל.'
       : 'שגיאה: '+error.message);
     return;
   }
+  if(staffRole && newId){
+    const {data: tpl} = await sb.from('staff_role_templates').select('permissions').eq('id', staffRole).maybeSingle();
+    if(tpl) await sb.from('profiles').update({staff_role: staffRole, permissions: tpl.permissions}).eq('id', newId);
+  }
   ['adm-new-name','adm-new-biz','adm-new-email','adm-new-phone','adm-new-pass'].forEach(id=>document.getElementById(id).value='');
+  if(el('adm-new-staffrole-wrap')) el('adm-new-staffrole-wrap').style.display='none';
   await refreshUsersCache(); renderAdminPanel(); alert('✅ לקוח נוסף בהצלחה!');
+}
+
+// Edit staff role for an existing admin-role user (full_admin only)
+async function openEditStaffRole(email){
+  if(!hasPermission('full_admin')){ alert('דורש הרשאת מנהל מלא'); return; }
+  const users=getUsers(); const u=users[email]; if(!u) return;
+  const current = u.staffRole||'customer_service';
+  const chosen = prompt(
+    `תפקיד נוכחי: ${staffRoleLabel(current)}\n\nבחר תפקיד חדש:\n1 - 👑 מנהל מלא\n2 - 💰 הנהלת חשבונות\n3 - 🔍 אחראי/מפקח\n4 - 🎧 שירות לקוחות\n\nהזן מספר (1-4):`,
+    ''
+  );
+  const roleMap={'1':'full_admin','2':'bookkeeping','3':'supervisor','4':'customer_service'};
+  const newRole = roleMap[chosen?.trim()];
+  if(!newRole){ alert('בחירה לא תקינה'); return; }
+  await saveStaffRole(email, newRole);
+}
+async function saveStaffRole(email, staffRole){
+  const users=getUsers(); const u=users[email]; if(!u||!u.id) return;
+  const {data: tpl, error: tplErr} = await sb.from('staff_role_templates').select('permissions').eq('id', staffRole).maybeSingle();
+  if(tplErr||!tpl){ alert('שגיאה בטעינת תבנית התפקיד'); return; }
+  const {error} = await sb.from('profiles').update({staff_role: staffRole, permissions: tpl.permissions}).eq('id', u.id);
+  if(error){ alert('שגיאה: '+error.message); return; }
+  await refreshUsersCache(); renderAdminPanel();
+  alert(`✅ תפקיד עודכן ל-${staffRoleLabel(staffRole)}`);
 }
 async function adminChangePass(){
   const oldP=document.getElementById('adm-pass-old').value;
