@@ -2881,19 +2881,80 @@ async function loadWebForms(){
 }
 function renderWebFormsList(){
   el('web-forms-count').textContent = webFormsData.length+' קטגוריות';
-  el('web-forms-list').innerHTML = webFormsData.map((f,i)=>`<div class="card2" style="margin-bottom:10px">
-    <div class="form-grid" style="grid-template-columns:1fr 1fr">
-      <div><div class="form-label">שם הקטגוריה</div><input id="frm-cat-${i}" value="${(f.category||'').replace(/"/g,'&quot;')}"></div>
-      <div><div class="form-label">אייקון (lucide)</div><input id="frm-icon-${i}" value="${(f.icon||'').replace(/"/g,'&quot;')}"></div>
-    </div>
-    ${jsonTextarea('frm-files-'+i,'קבצים (שלשות [שם, גודל, סוג])', f.files, 'לדוגמה: [["טופס X","PDF · 200KB","pdf"]]')}
-    <div style="display:flex;gap:8px;align-items:center">
-      <label style="display:flex;align-items:center;gap:4px;font-size:12px"><input type="checkbox" id="frm-vis-${i}" ${f.visible?'checked':''}> מוצג באתר</label>
-      <input type="number" id="frm-sort-${i}" value="${f.sort_order||0}" style="width:70px" title="סדר הצגה">
-      <button class="btn btn-sm" onclick="saveWebFormCat(${i})">💾 שמור</button>
-      <button class="btn btn-red btn-sm" onclick="deleteWebFormCat('${f.id}')">מחק</button>
-    </div>
-  </div>`).join('') || '<div style="color:var(--muted);font-size:12px;padding:10px">אין קטגוריות עדיין</div>';
+  el('web-forms-list').innerHTML = webFormsData.map((f,i)=>{
+    const filesHtml = (f.files||[]).map((file,j)=>{
+      const [name='',size='',type='',url=''] = Array.isArray(file) ? file : [file,'','',''];
+      return `<div class="card2" style="margin-bottom:6px;padding:8px">
+        <div class="form-grid" style="grid-template-columns:2fr 1fr 80px;gap:6px;margin-bottom:6px">
+          <div><div class="form-label">שם הקובץ</div><input id="frf-name-${i}-${j}" value="${name.replace(/"/g,'&quot;')}"></div>
+          <div><div class="form-label">גודל (תצוגה)</div><input id="frf-size-${i}-${j}" value="${size}" placeholder="PDF · 240KB"></div>
+          <div><div class="form-label">סוג</div><select id="frf-type-${i}-${j}">
+            <option value="pdf" ${type==='pdf'?'selected':''}>PDF</option>
+            <option value="xls" ${type==='xls'?'selected':''}>Excel</option>
+            <option value="doc" ${type==='doc'?'selected':''}>Word</option>
+          </select></div>
+        </div>
+        <div class="form-label">קישור הורדה</div>
+        <div style="display:flex;gap:6px;margin-bottom:4px">
+          <input id="frf-url-${i}-${j}" value="${(url||'').replace(/"/g,'&quot;')}" placeholder="https://... או העלה קובץ ←" style="flex:1">
+          <label style="padding:6px 10px;border-radius:6px;border:1px solid var(--accent);background:#10b98115;color:var(--accent);cursor:pointer;font-size:11px;font-weight:600;white-space:nowrap">
+            📤 העלה
+            <input type="file" style="display:none" accept=".pdf,.doc,.docx,.xls,.xlsx" onchange="uploadFormFile(this,${i},${j})">
+          </label>
+          <button class="btn btn-red btn-sm" onclick="removeFormFile(${i},${j})">✕</button>
+        </div>
+        ${url ? `<div style="font-size:10px;color:var(--accent)">✅ קישור מוגדר — <a href="${url}" target="_blank" style="color:var(--accent)">בדוק</a></div>` : '<div style="font-size:10px;color:var(--yellow)">⚠️ אין קישור — הקובץ לא יהיה להורדה</div>'}
+      </div>`;
+    }).join('');
+
+    return `<div class="card2" style="margin-bottom:12px">
+      <div class="form-grid" style="grid-template-columns:1fr 1fr;margin-bottom:10px">
+        <div><div class="form-label">שם הקטגוריה</div><input id="frm-cat-${i}" value="${(f.category||'').replace(/"/g,'&quot;')}"></div>
+        <div><div class="form-label">אייקון (lucide)</div><input id="frm-icon-${i}" value="${(f.icon||'').replace(/"/g,'&quot;')}"></div>
+      </div>
+      <div class="form-label" style="margin-bottom:6px">קבצים להורדה</div>
+      <div id="frm-files-container-${i}">${filesHtml}</div>
+      <button class="btn btn-sm" onclick="addFormFile(${i})" style="margin-bottom:10px;margin-top:2px">+ הוסף קובץ</button>
+      <div style="display:flex;gap:8px;align-items:center">
+        <label style="display:flex;align-items:center;gap:4px;font-size:12px"><input type="checkbox" id="frm-vis-${i}" ${f.visible?'checked':''}> מוצג באתר</label>
+        <input type="number" id="frm-sort-${i}" value="${f.sort_order||0}" style="width:70px" title="סדר הצגה">
+        <button class="btn btn-sm" onclick="saveWebFormCat(${i})">💾 שמור</button>
+        <button class="btn btn-red btn-sm" onclick="deleteWebFormCat('${f.id}')">מחק קטגוריה</button>
+      </div>
+    </div>`;
+  }).join('') || '<div style="color:var(--muted);font-size:12px;padding:10px">אין קטגוריות עדיין</div>';
+}
+function addFormFile(i){
+  const f = webFormsData[i];
+  f.files = [...(f.files||[]), ['קובץ חדש','','pdf','']];
+  renderWebFormsList();
+}
+function removeFormFile(i, j){
+  const f = webFormsData[i];
+  f.files = (f.files||[]).filter((_,idx)=>idx!==j);
+  renderWebFormsList();
+}
+async function uploadFormFile(input, i, j){
+  const file = input.files[0]; if(!file) return;
+  const ext = file.name.split('.').pop().toLowerCase();
+  const path = `forms/${Date.now()}-${file.name.replace(/\s/g,'_')}`;
+  const urlEl = el(`frf-url-${i}-${j}`);
+  if(urlEl) urlEl.value = '⏳ מעלה...';
+  const {data, error} = await sb.storage.from('site-forms').upload(path, file, {upsert:true});
+  if(error){ alert('שגיאת העלאה: '+error.message); if(urlEl) urlEl.value=''; return; }
+  const {data:{publicUrl}} = sb.storage.from('site-forms').getPublicUrl(path);
+  if(urlEl) urlEl.value = publicUrl;
+  // auto-detect size
+  const sizeEl = el(`frf-size-${i}-${j}`);
+  if(sizeEl && !sizeEl.value) sizeEl.value = ext.toUpperCase()+' · '+(file.size<1048576?(Math.round(file.size/1024)+'KB'):(Math.round(file.size/1048576*10)/10+'MB'));
+  // auto-detect type
+  const typeEl = el(`frf-type-${i}-${j}`);
+  if(typeEl){
+    if(['xls','xlsx'].includes(ext)) typeEl.value='xls';
+    else if(['doc','docx'].includes(ext)) typeEl.value='doc';
+    else typeEl.value='pdf';
+  }
+  alert('✅ הקובץ הועלה בהצלחה!');
 }
 async function addWebFormCat(){
   const id = 'fc-'+Date.now();
@@ -2901,9 +2962,18 @@ async function addWebFormCat(){
   if(error){ alert('שגיאה: '+error.message); return; }
   await loadWebForms();
 }
+function collectFormFiles(i){
+  const f = webFormsData[i];
+  return (f.files||[]).map((_,j)=>[
+    el(`frf-name-${i}-${j}`)?.value||'',
+    el(`frf-size-${i}-${j}`)?.value||'',
+    el(`frf-type-${i}-${j}`)?.value||'pdf',
+    el(`frf-url-${i}-${j}`)?.value||''
+  ]);
+}
 async function saveWebFormCat(i){
   const f = webFormsData[i];
-  let files; try{ files = parseJsonField('frm-files-'+i); }catch(e){ return; }
+  const files = collectFormFiles(i);
   const patch = {
     category: el('frm-cat-'+i).value, icon: el('frm-icon-'+i).value, files,
     visible: el('frm-vis-'+i).checked, sort_order: parseInt(el('frm-sort-'+i).value)||0,
@@ -2911,7 +2981,7 @@ async function saveWebFormCat(i){
   };
   const {error} = await sb.from('site_forms').update(patch).eq('id', f.id);
   if(error){ alert('שגיאה: '+error.message); return; }
-  await loadWebForms();
+  await loadWebForms(); alert('✅ נשמר!');
 }
 async function deleteWebFormCat(id){
   if(!confirm('למחוק קטגוריה זו?')) return;
