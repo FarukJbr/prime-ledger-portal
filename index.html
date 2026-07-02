@@ -2184,6 +2184,17 @@ async function loadWebSettings(){
       ${field('ws-hours','שעות פעילות',v('hours'),'','לדוגמה: א׳–ה׳ 09:00–18:00')}
     </div>
 
+    <div class="card2" style="margin-bottom:14px">
+      <div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.6px;color:var(--muted);margin-bottom:12px">📱 רשתות חברתיות</div>
+      <p style="color:var(--muted2);font-size:11px;margin-bottom:10px">הכנס קישור מלא (https://...) או מספר טלפון בלבד עבור וואטסאפ. שאר הרשתות: הדבק את כתובת הדף שלך. שדה ריק = האייקון לא יוצג.</p>
+      <div class="form-grid" style="grid-template-columns:1fr 1fr;gap:12px">
+        ${field('ws-whatsapp','WhatsApp',v('social_whatsapp'),'💬','מספר טלפון: 0526643244 או קישור מלא')}
+        ${field('ws-facebook','Facebook',v('social_facebook'),'📘','https://facebook.com/yourpage')}
+        ${field('ws-instagram','Instagram',v('social_instagram'),'📸','https://instagram.com/yourprofile')}
+        ${field('ws-linkedin','LinkedIn',v('social_linkedin'),'💼','https://linkedin.com/company/yourco')}
+      </div>
+    </div>
+
     <div style="display:flex;align-items:center;gap:12px">
       <button class="btn-solid" onclick="saveWebSettings()" style="padding:9px 20px">
         💾 שמור שינויים
@@ -2196,6 +2207,10 @@ async function saveWebSettings(){
     brand_name: el('ws-brand').value, tagline: el('ws-tagline').value,
     phone_sales: el('ws-phone-sales').value, phone_support: el('ws-phone-support').value,
     email: el('ws-email').value, address: el('ws-address').value, hours: el('ws-hours').value,
+    social_whatsapp:  (el('ws-whatsapp') ||{}).value  || '',
+    social_facebook:  (el('ws-facebook') ||{}).value  || '',
+    social_instagram: (el('ws-instagram')||{}).value  || '',
+    social_linkedin:  (el('ws-linkedin') ||{}).value  || '',
     updated_at: new Date().toISOString()
   };
   const {error} = await sb.from('site_settings').update(patch).eq('id',1);
