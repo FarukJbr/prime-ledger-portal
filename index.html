@@ -2192,6 +2192,9 @@ async function loadWebSettings(){
         ${field('ws-facebook','Facebook',v('social_facebook'),'📘','https://facebook.com/yourpage')}
         ${field('ws-instagram','Instagram',v('social_instagram'),'📸','https://instagram.com/yourprofile')}
         ${field('ws-linkedin','LinkedIn',v('social_linkedin'),'💼','https://linkedin.com/company/yourco')}
+        ${field('ws-tiktok','TikTok',v('social_tiktok'),'🎵','https://tiktok.com/@yourprofile')}
+        ${field('ws-youtube','YouTube',v('social_youtube'),'▶️','https://youtube.com/@yourchannel')}
+        ${field('ws-lishka','לשכת מנהלי חשבונות',v('social_lishka'),'🏛️','קישור לפרופיל שלך בלשכה')}
       </div>
     </div>
 
@@ -2211,6 +2214,9 @@ async function saveWebSettings(){
     social_facebook:  (el('ws-facebook') ||{}).value  || '',
     social_instagram: (el('ws-instagram')||{}).value  || '',
     social_linkedin:  (el('ws-linkedin') ||{}).value  || '',
+    social_tiktok:    (el('ws-tiktok')   ||{}).value  || '',
+    social_youtube:   (el('ws-youtube')  ||{}).value  || '',
+    social_lishka:    (el('ws-lishka')   ||{}).value  || '',
     updated_at: new Date().toISOString()
   };
   const {error} = await sb.from('site_settings').update(patch).eq('id',1);
