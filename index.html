@@ -2929,10 +2929,23 @@ function addFormFile(i){
   f.files = [...(f.files||[]), ['קובץ חדש','','pdf','']];
   renderWebFormsList();
 }
-function removeFormFile(i, j){
+async function removeFormFile(i, j){
   const f = webFormsData[i];
+  const file = (f.files||[])[j];
+  const url = Array.isArray(file) ? file[3] : '';
+  // If it's a Supabase Storage URL, delete the actual file too
+  if(url && url.includes('urpzikwromhwtuffkhyr.supabase.co/storage/v1/object/public/site-forms/')){
+    const path = url.split('/site-forms/')[1];
+    if(path) await sb.storage.from('site-forms').remove([path]);
+  }
   f.files = (f.files||[]).filter((_,idx)=>idx!==j);
   renderWebFormsList();
+  // Show unsaved reminder
+  const countEl = el('web-forms-count');
+  if(countEl && !countEl.dataset.dirty){
+    countEl.dataset.dirty='1';
+    countEl.innerHTML += ' <span style="color:var(--yellow);font-size:11px">← יש שינויים שלא נשמרו — לחץ 💾</span>';
+  }
 }
 async function uploadFormFile(input, i, j){
   const file = input.files[0]; if(!file) return;
@@ -2981,6 +2994,8 @@ async function saveWebFormCat(i){
   };
   const {error} = await sb.from('site_forms').update(patch).eq('id', f.id);
   if(error){ alert('שגיאה: '+error.message); return; }
+  const countEl = el('web-forms-count');
+  if(countEl) delete countEl.dataset.dirty;
   await loadWebForms(); alert('✅ נשמר!');
 }
 async function deleteWebFormCat(id){
