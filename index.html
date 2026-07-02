@@ -2390,7 +2390,7 @@ function renderMyTicketsList(){
     return `<div class="card2" style="cursor:pointer;margin-bottom:8px;${ticketAgeStyle(t)}" onclick="openMyTicketThread('${t.id}')">
       <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:8px;flex-wrap:wrap">
         <div>
-          <div style="font-weight:700;font-size:13px">${t.subject}</div>
+          <div style="font-weight:700;font-size:13px">${t.subject} <span style="color:var(--muted);font-size:11px;font-weight:400">#${t.ticket_number||'—'}</span></div>
           <div style="font-size:11px;color:var(--muted);margin-top:2px">${t.category}</div>
         </div>
         <span style="background:${col}20;color:${col};border-radius:20px;padding:2px 10px;font-size:11px;font-weight:700;flex-shrink:0">${MY_TICKET_STATUS[t.status]||t.status}</span>
@@ -2423,7 +2423,7 @@ async function openMyTicketThread(id){
   if(el('my-ticket-thread')) el('my-ticket-thread').style.display='block';
   const col = MY_TICKET_STATUS_COLOR[t.status]||'var(--muted)';
   el('mtt-subject').textContent = t.subject;
-  el('mtt-meta').textContent = `קטגוריה: ${t.category} · נפתח ${new Date(t.created_at).toLocaleDateString('he-IL')}`;
+  el('mtt-meta').innerHTML = `<span style="color:var(--accent);font-weight:700">#${t.ticket_number||'—'}</span> · קטגוריה: ${t.category} · נפתח ${new Date(t.created_at).toLocaleDateString('he-IL')}`;
   el('mtt-status-badge').innerHTML = `<span style="background:${col}20;color:${col};border-radius:20px;padding:3px 12px;font-size:12px;font-weight:700">${MY_TICKET_STATUS[t.status]||t.status}</span>`;
   const {data:msgs} = await sb.from('support_messages').select('*').eq('ticket_id',id).order('created_at',{ascending:true});
   el('mtt-messages').innerHTML = (msgs||[]).map(m=>{
@@ -2499,7 +2499,7 @@ function renderTicketsList(){
     const statusBg=statusCol+'20';
     return`<div class="card2" style="cursor:pointer;margin-bottom:8px;border-right:4px solid ${pColor};${ageBg}" onclick="openTicketDetail('${t.id}')">
       <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:8px;flex-wrap:wrap">
-        <div><div style="font-weight:700;font-size:13px;margin-bottom:3px">${t.subject}</div>
+        <div><div style="font-weight:700;font-size:13px;margin-bottom:3px">${t.subject} <span style="color:var(--muted);font-size:11px;font-weight:400">#${t.ticket_number||'—'}</span></div>
           <div style="font-size:11px;color:var(--muted)">${t.client_email} · ${t.category}</div></div>
         <span style="background:${statusBg};color:${statusCol};border-radius:20px;padding:2px 8px;font-size:11px;font-weight:700;flex-shrink:0">${TICKET_STATUS_LABEL[t.status]||t.status}</span>
       </div>
@@ -2517,7 +2517,7 @@ async function openTicketDetail(id){
   await sb.from('support_tickets').update({last_checked_at:new Date().toISOString()}).eq('id',id);
   el('tickets-list').style.display='none';el('ticket-detail').style.display='block';
   el('td-subject').textContent=t.subject;el('td-status').value=t.status;el('td-priority').value=t.priority||'normal';
-  el('td-meta').innerHTML=`לקוח: <b>${t.client_email}</b> · קטגוריה: ${t.category} · נפתח: ${new Date(t.created_at).toLocaleDateString('he-IL')}`;
+  el('td-meta').innerHTML=`<span style="color:var(--accent);font-weight:700">#${t.ticket_number||'—'}</span> · לקוח: <b>${t.client_email}</b> · קטגוריה: ${t.category} · נפתח: ${new Date(t.created_at).toLocaleDateString('he-IL')}`;
   const {data:msgs}=await sb.from('support_messages').select('*').eq('ticket_id',id).order('created_at',{ascending:true});
   el('td-messages').innerHTML=(msgs||[]).map(m=>{
     const isAdmin=m.sender==='admin';
