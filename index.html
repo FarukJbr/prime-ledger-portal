@@ -279,6 +279,47 @@ h2{font-size:16px;font-weight:800;margin-bottom:4px}
 
 <!-- SETTINGS MODAL -->
 <div class="modal-bg" id="settings-modal" onclick="if(event.target===this)closeSettings()">
+
+<!-- New Ticket Modal (admin opens on behalf of client) -->
+<div class="modal-bg" id="new-ticket-modal" onclick="if(event.target===this)closeNewTicketModal()">
+  <div class="modal" style="max-width:460px">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px">
+      <span style="font-weight:800;font-size:14px">🎫 פנייה חדשה</span>
+      <button class="btn btn-sm" onclick="closeNewTicketModal()">✕</button>
+    </div>
+    <div class="form-label">לקוח</div>
+    <select id="nt-client" style="margin-bottom:10px">
+      <option value="">-- בחר לקוח --</option>
+    </select>
+    <div class="form-label">נושא</div>
+    <input id="nt-subject" placeholder="תיאור קצר של הנושא" style="margin-bottom:10px">
+    <div class="form-grid" style="grid-template-columns:1fr 1fr;gap:8px;margin-bottom:10px">
+      <div>
+        <div class="form-label">קטגוריה</div>
+        <select id="nt-category">
+          <option value="כללי">כללי</option>
+          <option value="מסמכים">מסמכים</option>
+          <option value="חיוב">חיוב</option>
+          <option value="דוחות">דוחות</option>
+          <option value="טכני">טכני</option>
+          <option value="אחר">אחר</option>
+        </select>
+      </div>
+      <div>
+        <div class="form-label">עדיפות</div>
+        <select id="nt-priority">
+          <option value="low">🟢 נמוכה</option>
+          <option value="normal" selected>🔵 רגילה</option>
+          <option value="high">🟠 גבוהה</option>
+          <option value="urgent">🔴 דחופה</option>
+        </select>
+      </div>
+    </div>
+    <div class="form-label">הודעה ראשונה</div>
+    <textarea id="nt-body" rows="4" placeholder="פרט את הבעיה / הנושא..." style="width:100%;background:var(--surface);border:1px solid var(--border);border-radius:6px;color:var(--text);padding:8px;font-family:inherit;font-size:13px;direction:rtl;resize:vertical;margin-bottom:12px"></textarea>
+    <button class="btn-solid" onclick="submitNewTicket()" style="width:100%">+ פתח פנייה</button>
+  </div>
+</div>
   <div class="modal">
     <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px">
       <span style="font-weight:800;font-size:15px">⚙️ הגדרות</span>
@@ -469,6 +510,7 @@ h2{font-size:16px;font-weight:800;margin-bottom:4px}
       <button class="side-btn" onclick="switchPortalTab('loans',this)"><span class="side-icon">🏦</span> הלוואות</button>
       <button class="side-btn" id="files-sb-btn" onclick="switchPortalTab('files',this)"><span class="side-icon">📊</span> דוח שנתי (1301)</button>
       <button class="side-btn" id="wealth-sb-btn" onclick="switchPortalTab('wealth',this)"><span class="side-icon">🏛️</span> הצהרת הון</button>
+      <button class="side-btn" onclick="switchPortalTab('tickets',this)" id="tickets-sb-btn"><span class="side-icon">📬</span> הפניות שלי <span class="side-badge" id="tickets-sb-badge" style="display:none">0</span></button>
       <div class="sidebar-section" id="admin-sb-section" style="display:none">ניהול מנהל</div>
       <button class="side-btn" id="admin-sb-btn" style="display:none" onclick="switchPortalTab('admin',this)"><span class="side-icon">👑</span> פאנל מנהל <span class="side-badge" id="admin-badge-count" style="display:none">0</span></button>
       <div class="sidebar-section">מידע</div>
@@ -545,6 +587,15 @@ h2{font-size:16px;font-weight:800;margin-bottom:4px}
           <div class="sec-title" style="color:#f59e0b">⏰ תזכורות</div>
           <div id="reminders-list"></div>
         </div>
+
+        <!-- OPEN TICKETS WIDGET (new + in_progress only) -->
+        <div class="card" id="home-tickets-card" style="border-color:#3b82f640;display:none">
+          <div class="sec-title" style="color:var(--blue2)">📬 פניות פתוחות
+            <button class="btn btn-sm" onclick="switchPortalTab('tickets',document.getElementById('tickets-sb-btn'))" style="font-size:11px">כל הפניות</button>
+          </div>
+          <div id="home-tickets-list"></div>
+        </div>
+
         <div class="card">
           <div class="sec-title">📣 עדכונים מהמשרד</div>
           <div id="admin-messages"><div style="color:var(--muted2);font-size:14px;padding:8px 0;line-height:1.7">טוען עדכונים...</div></div>
@@ -806,7 +857,8 @@ h2{font-size:16px;font-weight:800;margin-bottom:4px}
           <button class="navbtn active" onclick="switchAdminSubTab('clients',this)">👥 לקוחות</button>
           <button class="navbtn" onclick="switchAdminSubTab('viewer',this)">👁️ צפייה בנתוני לקוח</button>
           <button class="navbtn" onclick="switchAdminSubTab('reports',this)">📊 דוחות שנתיים</button>
-          ${hasPermission('manage_website') ? `<button class="navbtn" onclick="switchAdminSubTab('website',this)">🌐 ניהול אתר</button>` : ''}
+          <button class="navbtn" onclick="switchAdminSubTab('tickets',this)">🎫 פניות</button>
+          <button class="navbtn" id="adm-tab-website" style="display:none" onclick="switchAdminSubTab('website',this)">🌐 ניהול אתר</button>
         </div>
 
         <!-- ══ SUB-TAB: CLIENTS ══ -->
@@ -949,13 +1001,65 @@ h2{font-size:16px;font-weight:800;margin-bottom:4px}
         <div id="adm-sub-viewer" class="adm-subtab">
         <div class="card no-print">
           <div class="sec-title">👁️ צפייה בנתוני לקוח</div>
-          <p class="subtitle" style="margin-top:-4px">חשבונות, יתרות ורישומים אחרונים — בלי לצאת לפורטל.</p>
+          <p class="subtitle" style="margin-top:-4px">פרטים מלאים, חשבונות ורישומים אחרונים.</p>
           <select id="adm-view-client-select" onchange="adminViewClientData(this.value)" style="margin-bottom:10px">
             <option value="">-- בחר לקוח --</option>
           </select>
           <div id="adm-client-view-results"></div>
         </div>
         </div><!-- /adm-sub-viewer -->
+
+        <!-- ══ SUB-TAB: SUPPORT TICKETS ══ -->
+        <div id="adm-sub-tickets" class="adm-subtab">
+          <div class="card no-print" style="margin-bottom:10px">
+            <div class="sec-title">🎫 פניות לקוחות <span id="tickets-count" style="color:var(--muted);font-size:11px"></span></div>
+            <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center">
+              <div class="acct-bar" id="tickets-filter-bar" style="margin:0">
+                <button class="acct-chip all active" onclick="setTicketsFilter('all',this)">הכל</button>
+                <button class="acct-chip" onclick="setTicketsFilter('new',this)" style="border-color:#3b82f640">🆕 חדש</button>
+                <button class="acct-chip" onclick="setTicketsFilter('in_progress',this)" style="border-color:#f59e0b40">✏️ בטיפול</button>
+                <button class="acct-chip" onclick="setTicketsFilter('waiting',this)" style="border-color:#8b5cf640">⏳ ממתין</button>
+                <button class="acct-chip" onclick="setTicketsFilter('resolved',this)" style="border-color:#10b98140">✅ נפתר</button>
+              </div>
+              <button class="btn-solid btn-sm" onclick="openNewTicketModal()" style="padding:5px 12px">+ פנייה חדשה</button>
+            </div>
+          </div>
+          <div id="tickets-list"></div>
+
+          <!-- Ticket detail view -->
+          <div id="ticket-detail" style="display:none">
+            <div style="display:flex;align-items:center;gap:8px;margin-bottom:10px">
+              <button class="btn btn-sm" onclick="closeTicketDetail()">← חזרה לרשימה</button>
+              <span id="td-subject" style="font-weight:700;font-size:14px"></span>
+            </div>
+            <div class="card" style="margin-bottom:10px">
+              <div style="display:flex;gap:10px;flex-wrap:wrap;align-items:center;justify-content:space-between">
+                <div id="td-meta" style="font-size:11px;color:var(--muted)"></div>
+                <div style="display:flex;gap:6px;flex-wrap:wrap">
+                  <select id="td-status" onchange="updateTicketStatus()" style="font-size:11px;width:auto">
+                    <option value="new">🆕 חדש</option>
+                    <option value="in_progress">✏️ בטיפול</option>
+                    <option value="waiting">⏳ ממתין ללקוח</option>
+                    <option value="resolved">✅ נפתר</option>
+                    <option value="closed">🔒 סגור</option>
+                  </select>
+                  <select id="td-priority" onchange="updateTicketPriority()" style="font-size:11px;width:auto">
+                    <option value="low">🟢 נמוכה</option>
+                    <option value="normal">🔵 רגילה</option>
+                    <option value="high">🟠 גבוהה</option>
+                    <option value="urgent">🔴 דחופה</option>
+                  </select>
+                </div>
+              </div>
+            </div>
+            <div id="td-messages" style="margin-bottom:10px"></div>
+            <div class="card">
+              <div class="form-label">תגובה חדשה (מנהל)</div>
+              <textarea id="td-reply-body" rows="3" style="width:100%;background:var(--surface);border:1px solid var(--border);border-radius:6px;color:var(--text);padding:8px;font-family:inherit;font-size:13px;direction:rtl;resize:vertical"></textarea>
+              <button class="btn-solid" onclick="sendTicketReply()" style="margin-top:6px">📤 שלח תגובה</button>
+            </div>
+          </div>
+        </div><!-- /adm-sub-tickets -->
 
         <!-- ══ SUB-TAB: ANNUAL REPORTS ══ -->
         <div id="adm-sub-reports" class="adm-subtab">
@@ -1126,6 +1230,59 @@ h2{font-size:16px;font-weight:800;margin-bottom:4px}
             <p>ניתן לשנות תוכנית מנוי בכל עת. שדרוג ייכנס לתוקף מיידית. שינמוך ייכנס לתוקף בתחילת תקופת החיוב הבאה.</p>
             <h4>4. יצירת קשר</h4>
             <p>לבקשות ביטול והחזר: 📧 info@primels.co.il | 📱 055-502-7988</p>
+          </div>
+        </div>
+      </div>
+
+      <!-- TICKETS TAB (client view) -->
+      <div id="ptab-tickets" class="portal-tab">
+        <h2>📬 הפניות שלי</h2>
+        <p class="subtitle">שאלות, בקשות ותקלות — צוות המשרד יחזור אליך בהקדם</p>
+        <div class="card no-print" style="margin-bottom:12px">
+          <div class="sec-title">פנייה חדשה</div>
+          <div class="form-grid" style="grid-template-columns:1fr 1fr;gap:8px;margin-bottom:8px">
+            <div><div class="form-label">נושא</div><input id="my-ticket-subject" placeholder="כותרת קצרה"></div>
+            <div><div class="form-label">קטגוריה</div>
+              <select id="my-ticket-category">
+                <option value="כללי">💬 כללי</option>
+                <option value="תיעוד">📄 תיעוד ומסמכים</option>
+                <option value="תשלום">💳 תשלום ומנוי</option>
+                <option value="דוחות">📊 דוחות ודיווחים</option>
+                <option value="טכני">🔧 תקלה טכנית</option>
+                <option value="שאלה">❓ שאלה מקצועית</option>
+              </select>
+            </div>
+          </div>
+          <div class="form-label">הודעה</div>
+          <textarea id="my-ticket-body" rows="3" placeholder="פרט את פנייתך..." style="width:100%;background:var(--surface);border:1px solid var(--border);border-radius:6px;color:var(--text);padding:8px;font-family:inherit;font-size:13px;direction:rtl;resize:vertical;margin-bottom:8px"></textarea>
+          <button class="btn-solid" onclick="clientSubmitTicket()">📤 שלח פנייה</button>
+        </div>
+
+        <div class="card">
+          <div class="sec-title">הפניות שלי <span id="my-tickets-count" style="color:var(--muted);font-size:11px"></span></div>
+          <div class="acct-bar no-print" style="margin-bottom:10px">
+            <button class="acct-chip all active" onclick="setMyTicketsFilter('all',this)">הכל</button>
+            <button class="acct-chip" onclick="setMyTicketsFilter('open',this)" style="border-color:#3b82f640">🔓 פתוח</button>
+            <button class="acct-chip" onclick="setMyTicketsFilter('resolved',this)" style="border-color:#10b98140">✅ נפתר</button>
+          </div>
+          <div id="my-tickets-list"><div style="color:var(--muted);font-size:12px;padding:12px">טוען...</div></div>
+        </div>
+
+        <!-- Single ticket thread view -->
+        <div id="my-ticket-thread" style="display:none">
+          <button class="btn btn-sm" onclick="closeMyTicketThread()" style="margin-bottom:10px">← חזרה לרשימה</button>
+          <div class="card" style="margin-bottom:10px">
+            <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:6px">
+              <div><div style="font-weight:700;font-size:14px" id="mtt-subject"></div>
+                <div id="mtt-meta" style="font-size:11px;color:var(--muted);margin-top:2px"></div></div>
+              <div id="mtt-status-badge"></div>
+            </div>
+          </div>
+          <div id="mtt-messages" style="margin-bottom:10px"></div>
+          <div class="card" id="mtt-reply-wrap">
+            <div class="form-label">הוסף הודעה</div>
+            <textarea id="mtt-reply" rows="2" placeholder="..." style="width:100%;background:var(--surface);border:1px solid var(--border);border-radius:6px;color:var(--text);padding:8px;font-family:inherit;font-size:13px;direction:rtl;resize:vertical;margin-bottom:6px"></textarea>
+            <button class="btn-solid btn-sm" onclick="clientReplyTicket()">📤 שלח</button>
           </div>
         </div>
       </div>
@@ -1691,6 +1848,7 @@ async function enterPortal(){
   renderHealthScore();
   loadAnnouncements();
   loadReminders();
+  if(currentUser.role !== 'admin') loadMyTickets();
   if(currentUser.role!=='admin'){
     document.getElementById('chat-widget-btn').style.display='flex';
     ensureMyReferralCode();
@@ -1699,6 +1857,7 @@ async function enterPortal(){
     renderAdminReferrals();
     renderAdminChatList();
     checkAdminNotifications();
+    initAdminTabBar();
     if(adminNotifyInterval) clearInterval(adminNotifyInterval);
     adminNotifyInterval = setInterval(checkAdminNotifications, 30000); // poll every 30s while portal tab is open
   }
@@ -1801,6 +1960,7 @@ function switchPortalTab(name,btn){
   document.getElementById('ptab-'+name).classList.add('active');
   if(btn) btn.classList.add('active');
   if(name==='cashflow') refreshAll();
+  if(name==='tickets' && currentUser?.role !== 'admin') loadMyTickets();
   if(name==='admin'){ refreshUsersCache().then(renderAdminPanel); renderAdminAnnouncements(); renderAdminReferrals(); renderAdminChatList(); }
   if(name==='plans') renderPlansTab();
   if(name==='referral') renderReferralTab();
@@ -2079,6 +2239,322 @@ function switchAdminSubTab(name, btn){
   const panel = el('adm-sub-'+name); if(panel) panel.classList.add('active');
   if(name==='website') loadWebLeads();
   if(name==='reports') loadAdminYearRequests();
+  if(name==='tickets'){ loadTickets(); if(el('ticket-detail'))el('ticket-detail').style.display='none'; if(el('tickets-list'))el('tickets-list').style.display='block'; }
+}
+function initAdminTabBar(){
+  const ws = el('adm-tab-website');
+  if(ws) ws.style.display = hasPermission('manage_website') ? '' : 'none';
+}
+
+// ══ ENHANCED CLIENT VIEWER ═══════════════════════════════════════════
+async function adminViewClientData(email){
+  const wrap = el('adm-client-view-results');
+  if(!wrap) return;
+  if(!email){ wrap.innerHTML = ''; return; }
+  wrap.innerHTML = '<div style="color:var(--muted);font-size:12px;padding:10px">טוען...</div>';
+  const uid = getUsers()[email]?.id||'';
+  const [{data:prof}, {data:accD,error:accErr}, {data:recD,error:recErr}] = await Promise.all([
+    uid ? sb.from('profiles').select('*').eq('id',uid).maybeSingle() : Promise.resolve({data:null}),
+    sb.from('portal_accounts').select('*').eq('client_email',email),
+    sb.from('portal_records').select('*').eq('client_email',email).order('record_date',{ascending:false}).limit(25)
+  ]);
+  const p = prof||{};
+  const infoRow=(label,val,icon)=>val?`<div style="display:flex;gap:8px;padding:5px 0;border-bottom:1px solid var(--border);font-size:12px"><span style="color:var(--muted);min-width:140px">${icon||''} ${label}</span><span style="font-weight:600">${val}</span></div>`:'';
+  const profileCard=`<div class="card" style="margin-bottom:10px">
+    <div class="sec-title" style="margin-bottom:10px">👤 פרטי הלקוח</div>
+    ${infoRow('שם מלא',p.full_name,'🙍')}${infoRow('שם עסק',p.company_name,'🏢')}
+    ${infoRow('ת.ז',p.tax_id,'🪪')}${infoRow('מספר עוסק/פטור',p.vat_num,'📋')}
+    ${infoRow('תיק מס הכנסה',p.tax_file_num,'🏛️')}${infoRow('תיק ביטוח לאומי',p.bituach_num,'🏥')}
+    ${infoRow('אימייל',email,'✉️')}${infoRow('טלפון',p.phone,'📱')}
+    ${infoRow('כתובת',[p.address,p.city].filter(Boolean).join(', '),'📍')}
+    ${infoRow('מנוי',p.plan==='pro'?'מקצועי ✅':'חינמי','💳')}
+    ${p.notes?infoRow('הערות פנימיות',p.notes,'📝'):''}
+    <div style="margin-top:10px;display:flex;gap:6px;flex-wrap:wrap">
+      <button class="btn btn-sm" onclick="openEditClientProfile('${email}')">✏️ ערוך פרטים</button>
+      <button class="btn btn-sm" onclick="openNewTicketModal('${email}')">🎫 פתח פנייה</button>
+    </div></div>`;
+  if(accErr||recErr){wrap.innerHTML=profileCard+`<div style="color:var(--red);font-size:12px">שגיאה: ${(accErr||recErr).message}</div>`;return;}
+  const clientAccounts=accD||[], clientRecords=recD||[];
+  const {data:allRecD}=await sb.from('portal_records').select('acct_id,amount,type,bank_row_id').eq('client_email',email);
+  const {data:allBankD}=await sb.from('portal_bank_rows').select('acct_id,debit,credit').eq('client_email',email);
+  const balanceFor=(acctId)=>{
+    const aR=(allRecD||[]).filter(r=>r.acct_id===acctId&&!r.bank_row_id);
+    const aB=(allBankD||[]).filter(r=>r.acct_id===acctId);
+    const inc=aR.filter(r=>r.type==='הכנסה').reduce((s,r)=>s+Number(r.amount||0),0)+aB.reduce((s,r)=>s+Number(r.credit||0),0);
+    const exp=aR.filter(r=>r.type==='הוצאה').reduce((s,r)=>s+Number(r.amount||0),0)+aB.reduce((s,r)=>s+Number(r.debit||0),0);
+    return Number((accD||[]).find(a=>a.id===acctId)?.opening||0)+inc-exp;
+  };
+  const acctsBlock=clientAccounts.length?`<div class="tbl-wrap"><table class="tbl"><thead><tr><th>חשבון</th><th>סוג</th><th>יתרה</th></tr></thead><tbody>${clientAccounts.map(a=>{const bal=balanceFor(a.id);return`<tr><td>${a.name}</td><td>${a.type==='bank'?'🏦 בנק':'💳 אשראי'}</td><td style="font-weight:700;color:${bal>=0?'var(--accent)':'var(--red)'}">${fmt(bal)}</td></tr>`;}).join('')}</tbody></table></div>`:'<div style="color:var(--muted);font-size:12px;padding:8px">אין חשבונות עדיין</div>';
+  const recordsBlock=clientRecords.length?`<div class="tbl-wrap"><table class="tbl"><thead><tr><th>תאריך</th><th>תיאור</th><th>סכום</th><th>סוג</th></tr></thead><tbody>${clientRecords.map(r=>`<tr><td>${r.record_date}</td><td>${r.description}</td><td style="color:${r.type==='הוצאה'?'var(--red)':'var(--accent)'};font-weight:700">${r.type==='הוצאה'?'-':'+'}${fmt(Number(r.amount||0))}</td><td><span class="badge ${r.type==='הוצאה'?'br':'bg'}">${r.type}</span></td></tr>`).join('')}</tbody></table></div>`:'<div style="color:var(--muted);font-size:12px;padding:8px">אין רישומים עדיין</div>';
+  wrap.innerHTML=profileCard+`<div class="card" style="margin-bottom:10px"><div class="sec-title">🏦 חשבונות</div>${acctsBlock}</div><div class="card"><div class="sec-title">📋 רישומים אחרונים (25)</div>${recordsBlock}</div>`;
+}
+async function openEditClientProfile(email){
+  const users=getUsers(); const u=users[email];
+  if(!u?.id){alert('לא נמצא ID ללקוח');return;}
+  const {data:p}=await sb.from('profiles').select('*').eq('id',u.id).maybeSingle();
+  if(!p) return;
+  const v=k=>(p[k]||'').toString().replace(/"/g,'&quot;');
+  const f=(id,label,val,ph='')=>`<div><div class="form-label">${label}</div><input id="ecp-${id}" value="${val}" placeholder="${ph}" style="margin-top:2px"></div>`;
+  const wrap=el('adm-client-view-results');
+  wrap.innerHTML=`<div class="card"><div class="sec-title">✏️ עריכת פרטי ${p.full_name||email}</div>
+    <div class="form-grid" style="grid-template-columns:1fr 1fr;gap:10px;margin-bottom:10px">
+      ${f('name','שם מלא',v('full_name'),'ישראל ישראלי')}${f('company','שם עסק',v('company_name'),'שם החברה')}
+      ${f('tax_id','ת.ז',v('tax_id'),'123456789')}${f('vat','מספר עוסק/פטור',v('vat_num'),'555012345')}
+      ${f('tax_file','תיק מס הכנסה',v('tax_file_num'),'')}${f('bituach','תיק ביטוח לאומי',v('bituach_num'),'')}
+      ${f('phone','טלפון',v('phone'),'050-0000000')}${f('address','כתובת',v('address'),'רחוב 1')}
+      ${f('city','עיר',v('city'),'תל אביב')}
+    </div>
+    <div class="form-label">הערות פנימיות</div>
+    <textarea id="ecp-notes" rows="2" style="width:100%;background:var(--surface);border:1px solid var(--border);border-radius:6px;color:var(--text);padding:8px;font-family:inherit;font-size:13px;direction:rtl;margin-bottom:10px">${p.notes||''}</textarea>
+    <div style="display:flex;gap:8px">
+      <button class="btn-solid" onclick="saveClientProfile('${u.id}','${email}')">💾 שמור</button>
+      <button class="btn" onclick="adminViewClientData('${email}')">ביטול</button>
+    </div></div>`;
+}
+async function saveClientProfile(uid,email){
+  const patch={full_name:el('ecp-name')?.value||'',company_name:el('ecp-company')?.value||'',
+    tax_id:el('ecp-tax_id')?.value||'',vat_num:el('ecp-vat')?.value||'',
+    tax_file_num:el('ecp-tax_file')?.value||'',bituach_num:el('ecp-bituach')?.value||'',
+    phone:el('ecp-phone')?.value||'',address:el('ecp-address')?.value||'',
+    city:el('ecp-city')?.value||'',notes:el('ecp-notes')?.value||''};
+  const {error}=await sb.from('profiles').update(patch).eq('id',uid);
+  if(error){alert('שגיאה: '+error.message);return;}
+  await refreshUsersCache(); adminViewClientData(email);
+}
+
+// ══ CLIENT-SIDE TICKETS ═══════════════════════════════════════════════
+// Functions used when a regular client (non-admin) views their own tickets.
+
+const MY_TICKET_STATUS = {
+  new:'🆕 חדש', in_progress:'✏️ בטיפול', waiting:'⏳ ממתין לך',
+  resolved:'✅ נפתר', closed:'🔒 סגור'
+};
+const MY_TICKET_STATUS_COLOR = {
+  new:'#3b82f6', in_progress:'#f59e0b', waiting:'#8b5cf6', resolved:'#10b981', closed:'#64748b'
+};
+let myTicketsData = [], myTicketsFilter = 'all', myCurrentTicketId = null;
+
+function setMyTicketsFilter(f, btn){
+  myTicketsFilter = f;
+  document.querySelectorAll('#my-tickets-list').forEach(()=>{});
+  document.querySelectorAll('.acct-chip').forEach(c=>{
+    if(c.closest('#ptab-tickets')) c.classList.remove('active');
+  });
+  if(btn) btn.classList.add('active');
+  renderMyTicketsList();
+}
+
+async function loadMyTickets(){
+  if(!currentUser || currentUser.role === 'admin') return;
+  const {data, error} = await sb.from('support_tickets')
+    .select('*').eq('client_email', currentUser.email).order('updated_at',{ascending:false});
+  if(error){ if(el('my-tickets-list')) el('my-tickets-list').innerHTML=`<div style="color:var(--red);font-size:12px">שגיאה: ${error.message}</div>`; return; }
+  myTicketsData = data || [];
+  renderMyTicketsList();
+  renderHomeTicketsWidget();
+  updateTicketsBadge();
+}
+
+function updateTicketsBadge(){
+  const open = myTicketsData.filter(t=>t.status!=='resolved'&&t.status!=='closed').length;
+  const badge = el('tickets-sb-badge');
+  if(badge){ badge.textContent = open; badge.style.display = open > 0 ? '' : 'none'; }
+}
+
+function ticketAgeStyle(t){
+  if(t.status==='resolved'||t.status==='closed') return '';
+  const days = (Date.now()-new Date(t.updated_at).getTime())/86400000;
+  if(days >= 7) return 'border-right:4px solid var(--red);background:#ef444410;';
+  if(days >= 3) return 'border-right:4px solid var(--yellow);background:#f59e0b10;';
+  return 'border-right:4px solid var(--blue2);';
+}
+function ticketAgeLabel(t){
+  if(t.status==='resolved'||t.status==='closed') return '';
+  const days = Math.floor((Date.now()-new Date(t.updated_at).getTime())/86400000);
+  if(days >= 7) return `<span style="color:var(--red);font-size:10px;font-weight:700">🔴 ${days} ימים ללא מענה</span>`;
+  if(days >= 3) return `<span style="color:var(--yellow);font-size:10px;font-weight:700">🟠 ${days} ימים ללא מענה</span>`;
+  return '';
+}
+
+function renderMyTicketsList(){
+  const list = el('my-tickets-list'); if(!list) return;
+  const filtered = myTicketsFilter === 'all'
+    ? myTicketsData
+    : myTicketsFilter === 'open'
+      ? myTicketsData.filter(t=>t.status!=='resolved'&&t.status!=='closed')
+      : myTicketsData.filter(t=>t.status===myTicketsFilter||t.status==='closed');
+  if(el('my-tickets-count')) el('my-tickets-count').textContent = filtered.length + ' פניות';
+  if(!filtered.length){ list.innerHTML='<div style="color:var(--muted);font-size:12px;padding:12px;text-align:center">אין פניות עדיין</div>'; return; }
+  list.innerHTML = filtered.map(t=>{
+    const col = MY_TICKET_STATUS_COLOR[t.status]||'var(--muted)';
+    return `<div class="card2" style="cursor:pointer;margin-bottom:8px;${ticketAgeStyle(t)}" onclick="openMyTicketThread('${t.id}')">
+      <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:8px;flex-wrap:wrap">
+        <div>
+          <div style="font-weight:700;font-size:13px">${t.subject}</div>
+          <div style="font-size:11px;color:var(--muted);margin-top:2px">${t.category}</div>
+        </div>
+        <span style="background:${col}20;color:${col};border-radius:20px;padding:2px 10px;font-size:11px;font-weight:700;flex-shrink:0">${MY_TICKET_STATUS[t.status]||t.status}</span>
+      </div>
+      <div style="display:flex;gap:10px;margin-top:5px;font-size:10px;color:var(--muted);flex-wrap:wrap">
+        <span>📅 נפתח ${new Date(t.created_at).toLocaleDateString('he-IL')}</span>
+        <span>🔄 עודכן ${new Date(t.updated_at).toLocaleDateString('he-IL')}</span>
+        ${ticketAgeLabel(t)}
+      </div>
+    </div>`;
+  }).join('');
+}
+
+function renderHomeTicketsWidget(){
+  const card = el('home-tickets-card'); const list = el('home-tickets-list');
+  if(!card||!list) return;
+  const open = myTicketsData.filter(t=>t.status!=='resolved'&&t.status!=='closed');
+  if(!open.length){ card.style.display='none'; return; }
+  card.style.display='block';
+  list.innerHTML = open.slice(0,3).map(t=>`<div style="display:flex;justify-content:space-between;align-items:center;padding:7px 0;border-bottom:1px solid var(--border);font-size:12px;cursor:pointer" onclick="switchPortalTab('tickets',document.getElementById('tickets-sb-btn'));setTimeout(()=>openMyTicketThread('${t.id}'),300)">
+    <span style="font-weight:600">${t.subject}</span>
+    <span style="font-size:10px;color:${MY_TICKET_STATUS_COLOR[t.status]||'var(--muted)'}">${MY_TICKET_STATUS[t.status]||t.status} ${ticketAgeLabel(t)}</span>
+  </div>`).join('');
+}
+
+async function openMyTicketThread(id){
+  myCurrentTicketId = id;
+  const t = myTicketsData.find(x=>x.id===id); if(!t) return;
+  el('my-tickets-list').parentElement.style.display='none';
+  if(el('my-ticket-thread')) el('my-ticket-thread').style.display='block';
+  const col = MY_TICKET_STATUS_COLOR[t.status]||'var(--muted)';
+  el('mtt-subject').textContent = t.subject;
+  el('mtt-meta').textContent = `קטגוריה: ${t.category} · נפתח ${new Date(t.created_at).toLocaleDateString('he-IL')}`;
+  el('mtt-status-badge').innerHTML = `<span style="background:${col}20;color:${col};border-radius:20px;padding:3px 12px;font-size:12px;font-weight:700">${MY_TICKET_STATUS[t.status]||t.status}</span>`;
+  const {data:msgs} = await sb.from('support_messages').select('*').eq('ticket_id',id).order('created_at',{ascending:true});
+  el('mtt-messages').innerHTML = (msgs||[]).map(m=>{
+    const isAdmin = m.sender==='admin';
+    return`<div style="display:flex;flex-direction:column;align-items:${isAdmin?'flex-start':'flex-end'};margin-bottom:10px">
+      <div style="background:${isAdmin?'var(--card2)':'#1e5fa820'};border:1px solid ${isAdmin?'var(--border)':'#1e5fa840'};border-radius:10px;padding:10px 14px;max-width:85%">
+        <div style="font-size:10px;color:var(--muted);margin-bottom:4px">${isAdmin?'👑 צוות המשרד':'👤 אתה'} · ${new Date(m.created_at).toLocaleString('he-IL')}</div>
+        <div style="font-size:13px;white-space:pre-wrap">${m.body}</div>
+      </div></div>`;
+  }).join('')||'<div style="color:var(--muted);font-size:12px;text-align:center;padding:16px">אין הודעות עדיין</div>';
+  // hide reply if resolved/closed
+  if(el('mtt-reply-wrap')) el('mtt-reply-wrap').style.display = (t.status==='resolved'||t.status==='closed') ? 'none' : 'block';
+}
+function closeMyTicketThread(){
+  myCurrentTicketId=null;
+  if(el('my-ticket-thread')) el('my-ticket-thread').style.display='none';
+  const wrap = el('my-tickets-list'); if(wrap) wrap.parentElement.style.display='block';
+}
+async function clientSubmitTicket(){
+  const subject=(el('my-ticket-subject')?.value||'').trim();
+  const body=(el('my-ticket-body')?.value||'').trim();
+  const category=el('my-ticket-category')?.value||'כללי';
+  if(!subject||!body){alert('נא למלא נושא והודעה');return;}
+  const {data:ticket,error}=await sb.from('support_tickets').insert({
+    client_email:currentUser.email, opened_by:'client', subject, category, priority:'normal', status:'new',
+    last_reply_by:'client', last_reply_at:new Date().toISOString()
+  }).select().single();
+  if(error){alert('שגיאה: '+error.message);return;}
+  await sb.from('support_messages').insert({ticket_id:ticket.id,sender:'client',sender_name:currentUser.name||'',body});
+  el('my-ticket-subject').value=''; el('my-ticket-body').value='';
+  await loadMyTickets();
+  alert('✅ הפנייה נשלחה! נחזור אליך בהקדם.');
+}
+async function clientReplyTicket(){
+  const body=(el('mtt-reply')?.value||'').trim();
+  if(!body||!myCurrentTicketId)return;
+  await Promise.all([
+    sb.from('support_messages').insert({ticket_id:myCurrentTicketId,sender:'client',sender_name:currentUser.name||'',body}),
+    sb.from('support_tickets').update({last_reply_at:new Date().toISOString(),last_reply_by:'client',updated_at:new Date().toISOString()}).eq('id',myCurrentTicketId)
+  ]);
+  el('mtt-reply').value='';
+  await loadMyTickets();
+  openMyTicketThread(myCurrentTicketId);
+}
+
+// ══ SUPPORT TICKETS ══════════════════════════════════════════════════
+const TICKET_STATUS_LABEL={new:'🆕 חדש',in_progress:'✏️ בטיפול',waiting:'⏳ ממתין',resolved:'✅ נפתר',closed:'🔒 סגור'};
+const TICKET_PRIORITY_COLOR={low:'#10b981',normal:'#3b82f6',high:'#f59e0b',urgent:'#ef4444'};
+let ticketsData=[],ticketsFilter='all',currentTicketId=null;
+function setTicketsFilter(f,btn){ticketsFilter=f;document.querySelectorAll('#tickets-filter-bar .acct-chip').forEach(c=>c.classList.remove('active'));if(btn)btn.classList.add('active');renderTicketsList();}
+async function loadTickets(){
+  const list=el('tickets-list');if(!list)return;
+  list.innerHTML='<div style="color:var(--muted);font-size:12px;padding:12px">טוען...</div>';
+  const {data,error}=await sb.from('support_tickets').select('*').order('updated_at',{ascending:false});
+  if(error){list.innerHTML=`<div style="color:var(--red);font-size:12px">שגיאה: ${error.message}</div>`;return;}
+  ticketsData=data||[];renderTicketsList();
+}
+function renderTicketsList(){
+  const list=el('tickets-list');if(!list)return;
+  const now=Date.now();
+  const filtered=ticketsFilter==='all'?ticketsData.filter(t=>t.status!=='closed'):ticketsData.filter(t=>t.status===ticketsFilter);
+  if(el('tickets-count'))el('tickets-count').textContent=filtered.length+' פניות';
+  if(!filtered.length){list.innerHTML='<div class="card" style="text-align:center;color:var(--muted);padding:24px">אין פניות בסטטוס זה</div>';return;}
+  list.innerHTML=filtered.map(t=>{
+    const daysSinceUpdate=(now-new Date(t.updated_at).getTime())/86400000;
+    let ageBg='',ageLabel='';
+    if(t.status!=='resolved'&&t.status!=='closed'){
+      if(daysSinceUpdate>=7){ageBg='background:#ef444418;border-color:#ef444450';ageLabel=`<span style="color:var(--red);font-size:10px;font-weight:700">🔴 ${Math.floor(daysSinceUpdate)} ימים ללא מענה</span>`;}
+      else if(daysSinceUpdate>=3){ageBg='background:#f59e0b12;border-color:#f59e0b40';ageLabel=`<span style="color:var(--yellow);font-size:10px;font-weight:700">🟠 ${Math.floor(daysSinceUpdate)} ימים ללא מענה</span>`;}
+    }
+    const pColor=TICKET_PRIORITY_COLOR[t.priority]||'var(--muted)';
+    const statusCol={new:'#3b82f6',in_progress:'#f59e0b',waiting:'#8b5cf6',resolved:'#10b981',closed:'#64748b'}[t.status]||'var(--muted)';
+    const statusBg=statusCol+'20';
+    return`<div class="card2" style="cursor:pointer;margin-bottom:8px;border-right:4px solid ${pColor};${ageBg}" onclick="openTicketDetail('${t.id}')">
+      <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:8px;flex-wrap:wrap">
+        <div><div style="font-weight:700;font-size:13px;margin-bottom:3px">${t.subject}</div>
+          <div style="font-size:11px;color:var(--muted)">${t.client_email} · ${t.category}</div></div>
+        <span style="background:${statusBg};color:${statusCol};border-radius:20px;padding:2px 8px;font-size:11px;font-weight:700;flex-shrink:0">${TICKET_STATUS_LABEL[t.status]||t.status}</span>
+      </div>
+      <div style="display:flex;gap:12px;margin-top:6px;font-size:10px;color:var(--muted);flex-wrap:wrap">
+        <span>📅 ${new Date(t.created_at).toLocaleDateString('he-IL')}</span>
+        <span>🔄 ${new Date(t.updated_at).toLocaleDateString('he-IL')}</span>
+        ${t.last_checked_at?`<span>👁️ ${new Date(t.last_checked_at).toLocaleDateString('he-IL')}</span>`:''}
+        ${ageLabel}
+      </div></div>`;
+  }).join('');
+}
+async function openTicketDetail(id){
+  currentTicketId=id;
+  const t=ticketsData.find(x=>x.id===id);if(!t)return;
+  await sb.from('support_tickets').update({last_checked_at:new Date().toISOString()}).eq('id',id);
+  el('tickets-list').style.display='none';el('ticket-detail').style.display='block';
+  el('td-subject').textContent=t.subject;el('td-status').value=t.status;el('td-priority').value=t.priority||'normal';
+  el('td-meta').innerHTML=`לקוח: <b>${t.client_email}</b> · קטגוריה: ${t.category} · נפתח: ${new Date(t.created_at).toLocaleDateString('he-IL')}`;
+  const {data:msgs}=await sb.from('support_messages').select('*').eq('ticket_id',id).order('created_at',{ascending:true});
+  el('td-messages').innerHTML=(msgs||[]).map(m=>{
+    const isAdmin=m.sender==='admin';
+    return`<div style="display:flex;flex-direction:column;align-items:${isAdmin?'flex-start':'flex-end'};margin-bottom:10px">
+      <div style="background:${isAdmin?'var(--card)':'#1e5fa820'};border:1px solid ${isAdmin?'var(--border)':'#1e5fa840'};border-radius:10px;padding:10px 14px;max-width:85%">
+        <div style="font-size:10px;color:var(--muted);margin-bottom:4px">${isAdmin?'👑 צוות המשרד':'👤 לקוח'} · ${new Date(m.created_at).toLocaleString('he-IL')}</div>
+        <div style="font-size:13px;white-space:pre-wrap">${m.body}</div>
+      </div></div>`;
+  }).join('')||'<div style="color:var(--muted);font-size:12px;text-align:center;padding:16px">אין הודעות עדיין</div>';
+}
+function closeTicketDetail(){currentTicketId=null;el('ticket-detail').style.display='none';el('tickets-list').style.display='block';loadTickets();}
+async function updateTicketStatus(){if(!currentTicketId)return;await sb.from('support_tickets').update({status:el('td-status').value,updated_at:new Date().toISOString()}).eq('id',currentTicketId);}
+async function updateTicketPriority(){if(!currentTicketId)return;await sb.from('support_tickets').update({priority:el('td-priority').value,updated_at:new Date().toISOString()}).eq('id',currentTicketId);}
+async function sendTicketReply(){
+  const body=el('td-reply-body')?.value?.trim();if(!body||!currentTicketId)return;
+  await Promise.all([
+    sb.from('support_messages').insert({ticket_id:currentTicketId,sender:'admin',sender_name:'צוות המשרד',body}),
+    sb.from('support_tickets').update({last_reply_at:new Date().toISOString(),last_reply_by:'admin',status:el('td-status').value,updated_at:new Date().toISOString()}).eq('id',currentTicketId)
+  ]);
+  el('td-reply-body').value='';await openTicketDetail(currentTicketId);
+}
+function openNewTicketModal(preEmail=''){
+  const sel=el('nt-client');if(!sel)return;
+  const users=getUsers();
+  sel.innerHTML='<option value="">-- בחר לקוח --</option>'+Object.entries(users).filter(([,u])=>u.role!=='admin').map(([email,u])=>`<option value="${email}" ${email===preEmail?'selected':''}>${u.name||email}</option>`).join('');
+  if(el('nt-body'))el('nt-body').value='';if(el('nt-subject'))el('nt-subject').value='';
+  el('new-ticket-modal').classList.add('open');
+}
+function closeNewTicketModal(){el('new-ticket-modal').classList.remove('open');}
+async function submitNewTicket(){
+  const client=el('nt-client')?.value,subject=el('nt-subject')?.value?.trim(),body=el('nt-body')?.value?.trim();
+  const category=el('nt-category')?.value||'כללי',priority=el('nt-priority')?.value||'normal';
+  if(!client||!subject||!body){alert('נא למלא לקוח, נושא והודעה');return;}
+  const {data:ticket,error}=await sb.from('support_tickets').insert({client_email:client,opened_by:'admin',subject,category,priority,status:'new',last_reply_by:'admin',last_reply_at:new Date().toISOString()}).select().single();
+  if(error){alert('שגיאה: '+error.message);return;}
+  await sb.from('support_messages').insert({ticket_id:ticket.id,sender:'admin',sender_name:'צוות המשרד',body});
+  closeNewTicketModal();await loadTickets();
 }
 
 // ════════════════════════════════════════════════════════════════
