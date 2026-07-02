@@ -2146,17 +2146,50 @@ async function loadWebSettings(){
   const {data, error} = await sb.from('site_settings').select('*').eq('id',1).maybeSingle();
   if(error){ el('web-settings-form').innerHTML = `<div style="color:var(--red);font-size:12px">שגיאה: ${error.message}</div>`; return; }
   const s = data || {};
-  const f = (id,label,val)=>`<div style="margin-bottom:8px"><div class="form-label">${label}</div><input id="${id}" value="${(val||'').toString().replace(/"/g,'&quot;')}"></div>`;
-  el('web-settings-form').innerHTML =
-    f('ws-brand','שם המותג', s.brand_name) +
-    f('ws-tagline','תיאור קצר (טאגליין)', s.tagline) +
-    f('ws-phone-sales','טלפון מכירות', s.phone_sales) +
-    f('ws-phone-support','טלפון תמיכה', s.phone_support) +
-    f('ws-email','אימייל', s.email) +
-    f('ws-address','כתובת', s.address) +
-    f('ws-hours','שעות פעילות', s.hours) +
-    `<button class="btn-solid" onclick="saveWebSettings()">💾 שמור הגדרות</button>
-     <span id="ws-save-status" style="font-size:11px;color:var(--accent);margin-right:8px"></span>`;
+  const v = k => (s[k]||'').toString().replace(/"/g,'&quot;');
+  const field = (id,label,val,icon,hint) => `
+    <div>
+      <div class="form-label" style="display:flex;align-items:center;gap:5px">
+        ${icon?`<span style="font-size:13px">${icon}</span>`:''}${label}
+        ${hint?`<span style="color:var(--muted);font-weight:400;font-size:10px">— ${hint}</span>`:''}
+      </div>
+      <input id="${id}" value="${val}" style="margin-top:3px">
+    </div>`;
+
+  el('web-settings-form').innerHTML = `
+    <p style="color:var(--muted2);font-size:12px;margin-bottom:16px">
+      השינויים שמורים ב-Supabase ומשתקפים באתר (primels.co.il) תוך שניות.
+    </p>
+
+    <div class="card2" style="margin-bottom:14px">
+      <div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.6px;color:var(--muted);margin-bottom:12px">🏢 זהות המותג</div>
+      <div class="form-grid" style="grid-template-columns:1fr 1fr;gap:12px">
+        ${field('ws-brand','שם המותג',v('brand_name'),'','מופיע בלוגו ובכותרת האתר')}
+        ${field('ws-tagline','תיאור קצר',v('tagline'),'','שורת טאגליין מתחת לשם')}
+      </div>
+    </div>
+
+    <div class="card2" style="margin-bottom:14px">
+      <div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.6px;color:var(--muted);margin-bottom:12px">📞 פרטי יצירת קשר</div>
+      <div class="form-grid" style="grid-template-columns:1fr 1fr;gap:12px">
+        ${field('ws-phone-sales','טלפון מכירות',v('phone_sales'),'📱')}
+        ${field('ws-phone-support','טלפון תמיכה',v('phone_support'),'📞')}
+        ${field('ws-email','אימייל',v('email'),'✉️')}
+        ${field('ws-address','כתובת',v('address'),'📍')}
+      </div>
+    </div>
+
+    <div class="card2" style="margin-bottom:16px">
+      <div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.6px;color:var(--muted);margin-bottom:12px">🕐 שעות פעילות</div>
+      ${field('ws-hours','שעות פעילות',v('hours'),'','לדוגמה: א׳–ה׳ 09:00–18:00')}
+    </div>
+
+    <div style="display:flex;align-items:center;gap:12px">
+      <button class="btn-solid" onclick="saveWebSettings()" style="padding:9px 20px">
+        💾 שמור שינויים
+      </button>
+      <span id="ws-save-status" style="font-size:12px;font-weight:600;color:var(--accent)"></span>
+    </div>`;
 }
 async function saveWebSettings(){
   const patch = {
