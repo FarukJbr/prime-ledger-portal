@@ -786,6 +786,7 @@ h2{font-size:16px;font-weight:800;margin-bottom:4px}
                 <select id="flt-cat" onchange="renderRecords()" style="width:auto;font-size:12px;padding:4px 7px"><option value="">כל הקטגוריות</option></select>
               </div>
             </div>
+            <div id="rec-monthly-usage" style="margin-bottom:8px"></div>
             <div class="print-bar">
               <button class="btn btn-blue" onclick="exportToExcel()">📊 Excel</button>
               <button class="btn btn-red" onclick="printSection('records')">🖨️ הדפסה</button>
@@ -793,8 +794,8 @@ h2{font-size:16px;font-weight:800;margin-bottom:4px}
             <div class="card">
               <div class="sec-title"><span>רישומים</span><span id="rec-count" style="color:var(--muted);font-size:11px"></span></div>
               <div class="tbl-wrap"><table class="tbl">
-                <thead><tr><th>תאריך</th><th>תיאור</th><th>קטגוריה</th><th>סוג</th><th>ע/פ</th><th>חשבון</th><th>סכום</th><th>סטטוס</th><th class="no-print"></th></tr></thead>
-                <tbody id="rec-tbody"><tr><td colspan="9" style="color:var(--muted);text-align:center;padding:14px">אין רישומים</td></tr></tbody>
+                <thead><tr><th>תאריך קבלה</th><th>תאריך הוספה</th><th>תיאור</th><th>קטגוריה</th><th>סוג</th><th>ע/פ</th><th>חשבון</th><th>סכום</th><th>סטטוס</th><th class="no-print"></th></tr></thead>
+                <tbody id="rec-tbody"><tr><td colspan="10" style="color:var(--muted);text-align:center;padding:14px">אין רישומים</td></tr></tbody>
               </table></div>
             </div>
           </div>
@@ -3455,23 +3456,36 @@ function renderAdminPanel(){
   }).join('');
 }
 
-function adminApproveUpgrade(email){
-  const users=getUsers(); if(!users[email]) return;
-  const oneMonthFromNow = new Date(); oneMonthFromNow.setMonth(oneMonthFromNow.getMonth()+1);
-  users[email].plan='pro';
-  users[email].planExpiresAt = oneMonthFromNow.toISOString();
-  users[email].upgradeRequested=false;
-  users[email].upgradeApprovedAt=new Date().toISOString();
-  saveUsers(users);
-  renderAdminPanel();
-  checkAdminNotifications();
+async function adminApproveUpgrade(email){
+  if(!confirm(`לאשר שדרוג מנוי ל-${email}? ודא שהתשלום התקבל.`)) return;
+  const users = getUsers();
+  const u = users[email]; if(!u || !u.id){ alert('לא נמצא משתמש'); return; }
+  const oneMonth = new Date(); oneMonth.setMonth(oneMonth.getMonth()+1);
+  const {error} = await sb.from('profiles').update({
+    plan: 'pro',
+    plan_expires_at: oneMonth.toISOString(),
+    upgrade_requested: false,
+    upgrade_requested_at: null,
+    plan_reminder_7d_sent_at: null,
+    plan_reminder_3d_sent_at: null
+  }).eq('id', u.id);
+  if(error){ alert('שגיאה: '+error.message); return; }
+  // also notify client via WhatsApp
+  if(u.phone){
+    await sb.rpc('notify_plan_upgraded', {
+      p_phone: u.phone,
+      p_name: u.name||email,
+      p_expires: oneMonth.toLocaleDateString('he-IL')
+    }).catch(()=>{});
+  }
+  await refreshUsersCache(); renderAdminPanel(); checkAdminNotifications();
+  alert(`✅ ${email} שודרג למקצועי עד ${oneMonth.toLocaleDateString('he-IL')}`);
 }
-function adminDismissUpgrade(email){
-  const users=getUsers(); if(!users[email]) return;
-  users[email].upgradeRequested=false;
-  saveUsers(users);
-  renderAdminPanel();
-  checkAdminNotifications();
+async function adminDismissUpgrade(email){
+  const users=getUsers(); const u=users[email]; if(!u||!u.id) return;
+  const {error} = await sb.from('profiles').update({upgrade_requested:false}).eq('id', u.id);
+  if(error){ alert('שגיאה: '+error.message); return; }
+  await refreshUsersCache(); renderAdminPanel(); checkAdminNotifications();
 }
 function openEditUser(email){
   const users=getUsers();
@@ -5173,9 +5187,18 @@ function setDashPeriod(v,btn){dashPeriod=v;document.querySelectorAll("#tab-dashb
 // ── RECORDS ──
 async function addRecord(){
   const plan = PLANS[currentUser?.plan||'free']||PLANS.free;
-  if(currentUser?.role!=='admin' && records.length>=plan.features.records){
-    openUpgradeModal(`הגעת למספר הרישומים המקסימלי במנוי ${plan.name} (${plan.features.records}). שדרג למקצועי לרישומים ללא הגבלה.`);
-    return;
+  // Monthly limit: count only records added THIS calendar month (created_at field).
+  // Records without created_at (added before this feature) are exempt — they
+  // carry forward visibly but don't consume the new monthly quota.
+  if(currentUser?.role!=='admin' && plan.features.records < 99999){
+    const now = new Date();
+    const monthStart = new Date(now.getFullYear(), now.getMonth(), 1).toISOString();
+    const thisMonthCount = records.filter(r=>r.created_at && r.created_at >= monthStart).length;
+    if(thisMonthCount >= plan.features.records){
+      const nextMonth = new Date(now.getFullYear(), now.getMonth()+1, 1).toLocaleDateString('he-IL');
+      openUpgradeModal(`הגעת למכסת הרישומים החודשית במנוי ${plan.name} (${plan.features.records} לחודש).\nב-${nextMonth} תתאפס המכסה ותוכל להוסיף שוב.\nלרישומים ללא הגבלה — שדרג למקצועי.`);
+      return;
+    }
   }
   const desc=el("r-desc").value.trim(), amount=parseFloat(el("r-amount").value);
   if(!desc||isNaN(amount)||amount<=0){alert("נא למלא תיאור וסכום");return;}
@@ -5183,9 +5206,15 @@ async function addRecord(){
   if(exactDup){alert(`⚠️ כפילות!\n\nקיים רישום זהה:\n"${exactDup.description}"\nסכום: ${fmt(exactDup.amount)}\nתאריך: ${exactDup.date}\n\nהרישום לא נוסף.`);return;}
   const similar=records.find(r=>r.description.trim().toLowerCase()===desc.toLowerCase()&&Math.abs(r.amount-amount)<0.01&&r.type===recordType);
   if(similar&&!confirm(`💡 רישום דומה קיים:\n"${similar.description}"\nסכום: ${fmt(similar.amount)}\nתאריך: ${similar.date}\n\nהאם להוסיף בכל זאת?`)) return;
-  records.push({id:"r-"+Date.now(),date:el("r-date").value||new Date().toISOString().slice(0,10),description:desc,amount,type:recordType,bp:recordBP,category:el("r-cat").value,acctId:el("r-acct").value||null,matched:false});
+  records.push({
+    id:"r-"+Date.now(),
+    date:el("r-date").value||new Date().toISOString().slice(0,10),
+    created_at: new Date().toISOString(),   // תאריך הוספה — מוגדר אוטומטית, לא ניתן לשינוי
+    description:desc, amount, type:recordType, bp:recordBP,
+    category:el("r-cat").value, acctId:el("r-acct").value||null, matched:false
+  });
   el("r-desc").value=""; el("r-amount").value="";
-  writeLocalBackup(); // optimistic — survives a refresh even if the save below hasn't reached the network yet
+  writeLocalBackup();
   refreshAll();
   const btn = el('add-record-btn');
   if(btn){ btn.disabled = true; btn.textContent = 'שומר...'; }
@@ -5210,10 +5239,13 @@ function renderRecords(){
   let f=records.filter(r=>(!ft||r.type===ft)&&(!fb||r.bp===fb)&&(!fa||r.acctId===fa)&&(!fc||r.category===fc));
   if(el("rec-count")) el("rec-count").textContent=f.length+" רישומים | "+fmt(f.reduce((s,r)=>s+(r.type==="הוצאה"?-r.amount:r.amount),0));
   const tb=el("rec-tbody"); if(!tb) return;
-  if(!f.length){tb.innerHTML=`<tr><td colspan="9" style="color:var(--muted);text-align:center;padding:14px">אין רישומים</td></tr>`;return;}
+  if(!f.length){tb.innerHTML=`<tr><td colspan="10" style="color:var(--muted);text-align:center;padding:14px">אין רישומים</td></tr>`;return;}
   const dups=findDuplicates(); const dupIds=new Set(dups.filter(d=>d.type==="records").flatMap(d=>[d.a,d.b]));
-  tb.innerHTML=f.sort((a,b)=>b.date.localeCompare(a.date)).map(r=>`<tr>
+  tb.innerHTML=f.sort((a,b)=>b.date.localeCompare(a.date)).map(r=>{
+    const addedAt = r.created_at ? new Date(r.created_at).toLocaleDateString('he-IL') : '—';
+    return `<tr>
     <td>${r.date}</td>
+    <td style="font-size:11px;color:var(--muted)">${addedAt}</td>
     <td>${r.description}${r.recurringItemId?` <span class="badge" style="background:#8b5cf630;color:#a78bfa">🔁 אוטומטי</span>`:""}${r.loanId?` <span class="badge" style="background:#8b5cf630;color:#a78bfa">🏦 הלוואה</span>`:""}${r.id&&r.id.startsWith('wa-')?` <span class="badge" style="background:#10b98130;color:#10b981">📷 וואטסאפ</span>`:""}${dupIds.has(r.id)?` <span class="badge" style="background:#ef444430;color:#ff6b6b">כפיל</span>`:""}</td>
     <td><span class="badge bb">${r.category}</span></td>
     <td><span class="badge ${r.type==="הוצאה"?"br":"bg"}">${r.type}</span></td>
@@ -5222,7 +5254,24 @@ function renderRecords(){
     <td style="color:${r.type==="הוצאה"?"#ef4444":"#10b981"};font-weight:700">${r.type==="הוצאה"?"-":"+"}${fmt(r.amount)}</td>
     <td>${r.matched?`<span class="badge bg">✓ מותאם</span>`:`<span class="badge by">ממתין</span>`}</td>
     <td class="no-print"><button class="btn btn-red btn-sm" onclick="deleteRecord('${r.id}')">מחק</button></td>
-  </tr>`).join("");
+  </tr>`;}).join("");
+  // Show monthly usage counter for free users
+  const plan = PLANS[currentUser?.plan||'free']||PLANS.free;
+  const usageEl = el('rec-monthly-usage');
+  if(usageEl && plan.features.records < 99999){
+    const now = new Date();
+    const monthStart = new Date(now.getFullYear(), now.getMonth(), 1).toISOString();
+    const thisMonth = records.filter(r=>r.created_at && r.created_at >= monthStart).length;
+    const pct = Math.min(100, Math.round(thisMonth/plan.features.records*100));
+    const color = pct>=100?'var(--red)':pct>=80?'var(--yellow)':'var(--accent)';
+    usageEl.innerHTML = `<div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">
+      <span style="font-size:12px;color:var(--muted)">מכסה חודשית:</span>
+      <span style="font-size:12px;font-weight:700;color:${color}">${thisMonth} / ${plan.features.records} רישומים</span>
+      <div style="flex:1;min-width:80px;background:var(--surface);border-radius:4px;height:6px">
+        <div style="width:${pct}%;background:${color};height:6px;border-radius:4px;transition:.3s"></div>
+      </div>
+    </div>`;
+  } else if(usageEl){ usageEl.innerHTML=''; }
   const uC=[...new Set(records.map(r=>r.category))];
   if(el("flt-cat")) el("flt-cat").innerHTML=`<option value="">כל הקטגוריות</option>`+uC.map(c=>`<option value="${c}"${fc===c?" selected":""}>${c}</option>`).join("");
 }
