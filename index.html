@@ -859,6 +859,7 @@ h2{font-size:16px;font-weight:800;margin-bottom:4px}
           <button class="navbtn" onclick="switchAdminSubTab('viewer',this)">👁️ צפייה בנתוני לקוח</button>
           <button class="navbtn" onclick="switchAdminSubTab('reports',this)">📊 דוחות שנתיים</button>
           <button class="navbtn" onclick="switchAdminSubTab('tickets',this)">🎫 פניות</button>
+          <button class="navbtn" onclick="switchAdminSubTab('finance',this)">💰 מעקב פיננסי</button>
           <button class="navbtn" id="adm-tab-website" style="display:none" onclick="switchAdminSubTab('website',this)">🌐 ניהול אתר</button>
         </div>
 
@@ -1093,6 +1094,52 @@ h2{font-size:16px;font-weight:800;margin-bottom:4px}
           <div id="adm-reports-list"><div style="color:var(--muted);font-size:12px;padding:10px">בחר שנה ולחץ "טען"</div></div>
         </div>
         </div><!-- /adm-sub-reports -->
+
+        <!-- ══ SUB-TAB: FINANCIAL TRACKING ══ -->
+        <div id="adm-sub-finance" class="adm-subtab">
+
+          <!-- Summary bar -->
+          <div id="fin-summary-bar" style="display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-bottom:14px"></div>
+
+          <!-- Add plan form -->
+          <div class="card no-print" style="margin-bottom:14px">
+            <div class="sec-title">+ הוסף לוח תשלום ללקוח</div>
+            <div class="form-grid" style="grid-template-columns:1fr 1fr;gap:10px;margin-bottom:10px">
+              <div>
+                <div class="form-label">לקוח</div>
+                <select id="fin-plan-client" style="width:100%"><option value="">-- בחר לקוח --</option></select>
+              </div>
+              <div>
+                <div class="form-label">שם שירות</div>
+                <select id="fin-plan-service" style="width:100%">
+                  <option>הנהלת חשבונות</option><option>חשבות שכר</option>
+                  <option>ייעוץ עסקי</option><option>ייעוץ פיננסי</option>
+                  <option>שיווק ופרסום</option><option>אחר</option>
+                </select>
+              </div>
+            </div>
+            <div class="form-grid" style="grid-template-columns:1fr 1fr 1fr;gap:10px;margin-bottom:10px">
+              <div><div class="form-label">סכום חודשי (₪)</div><input type="number" id="fin-plan-amount" placeholder="690"></div>
+              <div><div class="form-label">תאריך התחלה</div><input type="date" id="fin-plan-start"></div>
+              <div><div class="form-label">יום חיוב בחודש</div><input type="number" id="fin-plan-day" value="1" min="1" max="28"></div>
+            </div>
+            <div style="margin-bottom:10px"><div class="form-label">הערות</div><input id="fin-plan-notes" placeholder="הערה אופציונלית"></div>
+            <button class="btn-solid" onclick="addPaymentPlan()">+ הוסף לוח תשלום</button>
+          </div>
+
+          <!-- Client cards -->
+          <div id="fin-clients-list"><div style="color:var(--muted);font-size:12px;padding:10px">טוען...</div></div>
+
+          <!-- Client payment history modal -->
+          <div id="fin-client-detail" style="display:none">
+            <div style="display:flex;align-items:center;gap:10px;margin-bottom:14px">
+              <button class="btn btn-sm" onclick="closeClientDetail()">← חזרה</button>
+              <div id="fin-detail-title" style="font-weight:700;font-size:14px"></div>
+            </div>
+            <div id="fin-detail-plans"></div>
+            <div id="fin-detail-history"></div>
+          </div>
+        </div><!-- /adm-sub-finance -->
 
         <!-- ══ SUB-TAB: WEBSITE MANAGEMENT (primels.co.il content) ══ -->
         <div id="adm-sub-website" class="adm-subtab">
@@ -2241,10 +2288,184 @@ function switchAdminSubTab(name, btn){
   if(name==='website') loadWebLeads();
   if(name==='reports') loadAdminYearRequests();
   if(name==='tickets'){ loadTickets(); if(el('ticket-detail'))el('ticket-detail').style.display='none'; if(el('tickets-list'))el('tickets-list').style.display='block'; }
+  if(name==='finance') loadFinanceTracker();
 }
 function initAdminTabBar(){
   const ws = el('adm-tab-website');
   if(ws) ws.style.display = hasPermission('manage_website') ? '' : 'none';
+}
+
+// ════════════════════════════════════════════════════════════
+// FINANCIAL TRACKING — מעקב חובות לקוחות
+// ════════════════════════════════════════════════════════════
+let finClients=[],finPlans=[],finPayments=[],finDetailEmail=null;
+
+function paymentStatus(p){
+  if(p.status==='paid')    return{label:'✅ שולם',          color:'var(--accent)'};
+  if(p.status==='waived')  return{label:'🔵 ויתור',         color:'var(--blue2)'};
+  if(p.status==='partial') return{label:'🟡 חלקי',          color:'var(--yellow)'};
+  const days=Math.floor((Date.now()-new Date(p.billing_date).getTime())/86400000);
+  if(days>7)  return{label:`🔴 ${days} ימים איחור`,  color:'var(--red)'};
+  if(days>0)  return{label:`🟠 ${days} ימים איחור`,  color:'#f97316'};
+  const left=-days;
+  if(left<=7) return{label:`🟡 בעוד ${left} ימים`,   color:'var(--yellow)'};
+  return{label:'⚪ ממתין',color:'var(--muted)'};
+}
+
+async function loadFinanceTracker(){
+  const list=el('fin-clients-list'),detail=el('fin-client-detail');
+  if(detail) detail.style.display='none';
+  if(list)   list.style.display='block';
+  await sb.rpc('ensure_plan_payments').catch(()=>{});
+  const [pr,cr,ur]=await Promise.all([
+    sb.from('client_payment_plans').select('*').order('created_at'),
+    sb.from('client_payments').select('*').order('billing_date'),
+    sb.rpc('admin_list_users')
+  ]);
+  finPlans=pr.data||[]; finPayments=cr.data||[];
+  finClients=(ur.data||[]).filter(u=>u.role!=='admin');
+  const sel=el('fin-plan-client');
+  if(sel) sel.innerHTML='<option value="">-- בחר לקוח --</option>'+finClients.map(u=>`<option value="${u.email}">${u.full_name||u.email}</option>`).join('');
+  const sd=el('fin-plan-start'); if(sd&&!sd.value) sd.value=new Date().toISOString().slice(0,10);
+  renderFinanceSummary(); renderFinanceClientCards();
+}
+
+function renderFinanceSummary(){
+  const bar=el('fin-summary-bar'); if(!bar) return;
+  const totalPaid=finPayments.filter(p=>p.status==='paid').reduce((s,p)=>s+Number(p.paid_amount||0),0);
+  const overdue=finPayments.filter(p=>p.status==='pending'&&new Date(p.billing_date)<new Date(Date.now()-7*86400000));
+  const overdueAmt=overdue.reduce((s,p)=>s+Number(p.expected_amount),0);
+  const kpi=(l,v,c)=>`<div class="kpi" style="border-top:3px solid ${c}"><div class="kpi-lbl">${l}</div><div class="kpi-val" style="color:${c}">${v}</div></div>`;
+  bar.innerHTML=
+    kpi('תוכניות פעילות',finPlans.filter(p=>p.status==='active').length,'var(--blue2)')+
+    kpi('שולם סה"כ',fmt(totalPaid),'var(--accent)')+
+    kpi('פיגורים 7+ ימים',overdue.length+' תשלומים','var(--red)')+
+    kpi('סכום בפיגור',fmt(overdueAmt),'var(--red)');
+}
+
+function renderFinanceClientCards(){
+  const list=el('fin-clients-list'); if(!list) return;
+  const emails=[...new Set(finPlans.map(p=>p.client_email))];
+  if(!emails.length){list.innerHTML='<div class="card" style="text-align:center;color:var(--muted);padding:24px">אין לוחות תשלום — הוסף את הראשון למעלה</div>';return;}
+  const scored=emails.map(email=>{
+    const pmts=finPayments.filter(p=>p.client_email===email);
+    const overdue=pmts.filter(p=>p.status==='pending'&&new Date(p.billing_date)<new Date(Date.now()-7*86400000)).length;
+    const upcoming=pmts.filter(p=>{const d=new Date(p.billing_date),n=new Date();return p.status==='pending'&&d>=n&&d<=new Date(+n+7*86400000);}).length;
+    return{email,overdue,upcoming};
+  }).sort((a,b)=>b.overdue-a.overdue||b.upcoming-a.upcoming);
+  list.innerHTML=scored.map(({email})=>{
+    const user=finClients.find(u=>u.email===email);
+    const plans=finPlans.filter(p=>p.client_email===email&&p.status==='active');
+    const pmts=finPayments.filter(p=>p.client_email===email);
+    const overdue=pmts.filter(p=>p.status==='pending'&&new Date(p.billing_date)<new Date(Date.now()-7*86400000));
+    const upcoming=pmts.filter(p=>{const d=new Date(p.billing_date),n=new Date();return p.status==='pending'&&d>=n&&d<=new Date(+n+7*86400000);});
+    const owed=pmts.filter(p=>p.status==='pending'&&new Date(p.billing_date)<=new Date()).reduce((s,p)=>s+Number(p.expected_amount),0);
+    const monthly=plans.reduce((s,p)=>s+Number(p.amount_monthly),0);
+    const bdr=overdue.length?'var(--red)':upcoming.length?'var(--yellow)':pmts.some(p=>p.status==='paid')?'var(--accent)':'var(--border)';
+    const icon=overdue.length?'🔴':upcoming.length?'🟡':pmts.some(p=>p.status==='paid')?'🟢':'⚪';
+    return `<div class="card" style="border-right:4px solid ${bdr};margin-bottom:10px;cursor:pointer" onclick="openClientDetail('${email}')">
+      <div style="display:flex;justify-content:space-between;align-items:flex-start;flex-wrap:wrap;gap:6px">
+        <div><div style="font-weight:700;font-size:14px">${icon} ${user?.full_name||email}</div>
+          <div style="font-size:11px;color:var(--muted);margin-top:2px">${email} · ${plans.length} שירות · ₪${monthly.toLocaleString()}/חודש</div>
+        </div>
+        <div>${overdue.length?`<div style="color:var(--red);font-weight:700">${overdue.length} תשלומים בפיגור</div>`:''}
+          ${owed>0?`<div style="color:var(--red);font-size:12px">חוב: ${fmt(owed)}</div>`:''}
+          ${!overdue.length&&upcoming.length?`<div style="color:var(--yellow);font-size:12px">מגיע בשבוע הקרוב</div>`:''}
+          ${!overdue.length&&!upcoming.length&&owed===0?`<div style="color:var(--accent);font-size:12px">✅ מעודכן</div>`:''}
+        </div>
+      </div>
+      ${plans.map(p=>`<div style="font-size:11px;color:var(--muted);margin-top:3px">📋 ${p.service_name} · ₪${Number(p.amount_monthly).toLocaleString()} · כל ה-${p.billing_day}</div>`).join('')}
+    </div>`;
+  }).join('');
+}
+
+async function openClientDetail(email){
+  finDetailEmail=email;
+  const user=finClients.find(u=>u.email===email);
+  el('fin-clients-list').style.display='none';
+  el('fin-client-detail').style.display='block';
+  el('fin-detail-title').textContent=(user?.full_name||email)+' — היסטוריית תשלומים';
+  const plans=finPlans.filter(p=>p.client_email===email);
+  const pmts=finPayments.filter(p=>p.client_email===email).sort((a,b)=>b.billing_date.localeCompare(a.billing_date));
+  el('fin-detail-plans').innerHTML=`<div class="card" style="margin-bottom:12px">
+    <div class="sec-title">לוחות תשלום</div>
+    ${plans.map(p=>`<div class="card2" style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;flex-wrap:wrap;gap:6px">
+      <div><div style="font-weight:700">${p.service_name}</div>
+        <div style="font-size:11px;color:var(--muted)">₪${Number(p.amount_monthly).toLocaleString()}/חודש · יום ${p.billing_day} · מ-${p.start_date}</div>
+        ${p.notes?`<div style="font-size:11px;color:var(--muted2)">${p.notes}</div>`:''}
+      </div>
+      <div style="display:flex;gap:6px;align-items:center">
+        <select onchange="changePlanStatus('${p.id}',this.value)" style="font-size:11px;padding:3px 6px">
+          <option value="active" ${p.status==='active'?'selected':''}>✅ פעיל</option>
+          <option value="paused" ${p.status==='paused'?'selected':''}>⏸ מושהה</option>
+          <option value="cancelled" ${p.status==='cancelled'?'selected':''}>❌ בוטל</option>
+        </select>
+        <button class="btn btn-red btn-sm" onclick="deletePlan('${p.id}')">מחק</button>
+      </div>
+    </div>`).join('')||'<div style="color:var(--muted);font-size:12px">אין תוכניות</div>'}
+  </div>`;
+  el('fin-detail-history').innerHTML=`<div class="card">
+    <div class="sec-title">היסטוריית תשלומים</div>
+    <div class="tbl-wrap"><table class="tbl">
+      <thead><tr><th>חודש</th><th>תאריך חיוב</th><th>צפוי</th><th>שולם</th><th>תאריך תשלום</th><th>שיטה</th><th>סטטוס</th><th class="no-print"></th></tr></thead>
+      <tbody>${pmts.map(p=>{const st=paymentStatus(p);return`<tr style="${p.status==='pending'&&new Date(p.billing_date)<new Date(Date.now()-7*86400000)?'background:#ef444410':''}">
+        <td style="font-weight:600">${p.billing_month}</td>
+        <td style="font-size:11px">${p.billing_date}</td>
+        <td style="font-weight:700">${fmt(p.expected_amount)}</td>
+        <td style="color:var(--accent)">${p.paid_amount?fmt(p.paid_amount):'—'}</td>
+        <td style="font-size:11px">${p.paid_date||'—'}</td>
+        <td style="font-size:11px">${p.payment_method||'—'}</td>
+        <td><span style="color:${st.color};font-size:11px;font-weight:700">${st.label}</span></td>
+        <td class="no-print" style="white-space:nowrap">
+          ${p.status!=='paid'&&p.status!=='waived'?`<button class="btn btn-sm" style="border-color:var(--accent);color:var(--accent);margin-bottom:2px" onclick="markPaid('${p.id}',${p.expected_amount})">✅ שולם</button>`:''}
+          ${p.status==='pending'?`<button class="btn btn-sm" style="font-size:10px" onclick="waivePayment('${p.id}')">ויתור</button>`:''}
+        </td>
+      </tr>`}).join('')||`<tr><td colspan="8" style="text-align:center;color:var(--muted);padding:12px">אין תשלומים</td></tr>`}
+      </tbody>
+    </table></div>
+  </div>`;
+}
+
+function closeClientDetail(){finDetailEmail=null;el('fin-client-detail').style.display='none';el('fin-clients-list').style.display='block';}
+
+async function addPaymentPlan(){
+  const email=el('fin-plan-client').value,service=el('fin-plan-service').value;
+  const amount=parseFloat(el('fin-plan-amount').value),start=el('fin-plan-start').value;
+  const day=parseInt(el('fin-plan-day').value)||1,notes=el('fin-plan-notes').value;
+  if(!email||!amount||!start){alert('נא למלא לקוח, סכום ותאריך התחלה');return;}
+  const{error}=await sb.from('client_payment_plans').insert({client_email:email,service_name:service,amount_monthly:amount,start_date:start,billing_day:day,notes});
+  if(error){alert('שגיאה: '+error.message);return;}
+  await sb.rpc('ensure_plan_payments');
+  el('fin-plan-amount').value='';el('fin-plan-notes').value='';
+  await loadFinanceTracker(); alert('✅ לוח תשלום נוסף!');
+}
+
+async function markPaid(paymentId,expectedAmount){
+  const amount=parseFloat(prompt(`סכום שהתקבל (₪):`,expectedAmount));
+  if(isNaN(amount)) return;
+  const date=prompt('תאריך תשלום (YYYY-MM-DD):',new Date().toISOString().slice(0,10));
+  if(!date) return;
+  const method=prompt('שיטת תשלום:','העברה בנקאית')||'העברה בנקאית';
+  const{error}=await sb.from('client_payments').update({status:amount>=expectedAmount?'paid':'partial',paid_amount:amount,paid_date:date,payment_method:method}).eq('id',paymentId);
+  if(error){alert('שגיאה: '+error.message);return;}
+  await loadFinanceTracker(); if(finDetailEmail) openClientDetail(finDetailEmail);
+}
+
+async function waivePayment(id){
+  if(!confirm('לסמן כ"ויתור"?')) return;
+  await sb.from('client_payments').update({status:'waived'}).eq('id',id);
+  await loadFinanceTracker(); if(finDetailEmail) openClientDetail(finDetailEmail);
+}
+
+async function changePlanStatus(id,status){
+  await sb.from('client_payment_plans').update({status}).eq('id',id);
+  await loadFinanceTracker(); if(finDetailEmail) openClientDetail(finDetailEmail);
+}
+
+async function deletePlan(id){
+  if(!confirm('למחוק לוח תשלום? כל היסטוריית התשלומים תימחק.')) return;
+  await sb.from('client_payment_plans').delete().eq('id',id);
+  await loadFinanceTracker(); closeClientDetail();
 }
 
 // ══ ENHANCED CLIENT VIEWER ═══════════════════════════════════════════
