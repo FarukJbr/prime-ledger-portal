@@ -860,6 +860,7 @@ h2{font-size:16px;font-weight:800;margin-bottom:4px}
           <button class="navbtn" onclick="switchAdminSubTab('reports',this)">📊 דוחות שנתיים</button>
           <button class="navbtn" onclick="switchAdminSubTab('tickets',this)">🎫 פניות</button>
           <button class="navbtn" onclick="switchAdminSubTab('finance',this)">💰 מעקב פיננסי</button>
+          <button class="navbtn" onclick="switchAdminSubTab('analytics',this)">📊 אנליטיקס</button>
           <button class="navbtn" id="adm-tab-website" style="display:none" onclick="switchAdminSubTab('website',this)">🌐 ניהול אתר</button>
         </div>
 
@@ -1094,6 +1095,51 @@ h2{font-size:16px;font-weight:800;margin-bottom:4px}
           <div id="adm-reports-list"><div style="color:var(--muted);font-size:12px;padding:10px">בחר שנה ולחץ "טען"</div></div>
         </div>
         </div><!-- /adm-sub-reports -->
+
+        <!-- ══ SUB-TAB: ANALYTICS ══ -->
+        <div id="adm-sub-analytics" class="adm-subtab">
+          <!-- Period selector -->
+          <div style="display:flex;align-items:center;gap:10px;margin-bottom:14px;flex-wrap:wrap">
+            <span style="font-weight:700;font-size:13px">📊 אנליטיקס אתר</span>
+            <div style="display:flex;gap:6px">
+              <button class="btn btn-sm analytics-period active" onclick="loadAnalytics(7,this)">7 ימים</button>
+              <button class="btn btn-sm analytics-period" onclick="loadAnalytics(30,this)">30 יום</button>
+              <button class="btn btn-sm analytics-period" onclick="loadAnalytics(90,this)">90 יום</button>
+            </div>
+            <button class="btn btn-sm" onclick="loadAnalytics(analyticsCurrentDays)" style="margin-right:auto">🔄 רענן</button>
+          </div>
+
+          <!-- KPI cards -->
+          <div id="analytics-kpis" style="display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-bottom:14px"></div>
+
+          <!-- Charts row -->
+          <div style="display:grid;grid-template-columns:2fr 1fr;gap:12px;margin-bottom:12px">
+            <div class="card">
+              <div class="sec-title">ביקורים יומיים</div>
+              <div id="analytics-chart" style="height:160px;display:flex;align-items:flex-end;gap:3px;overflow-x:auto"></div>
+              <div style="display:flex;gap:14px;margin-top:8px;font-size:11px">
+                <span><span style="color:var(--blue2)">■</span> ביקורים</span>
+                <span><span style="color:var(--accent)">■</span> מבקרים ייחודיים</span>
+              </div>
+            </div>
+            <div class="card">
+              <div class="sec-title">ערוצי הגעה</div>
+              <div id="analytics-channels"></div>
+            </div>
+          </div>
+
+          <!-- Pages + devices row -->
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:12px">
+            <div class="card">
+              <div class="sec-title">דפים פופולריים</div>
+              <div id="analytics-pages"></div>
+            </div>
+            <div class="card">
+              <div class="sec-title">מכשירים</div>
+              <div id="analytics-devices"></div>
+            </div>
+          </div>
+        </div><!-- /adm-sub-analytics -->
 
         <!-- ══ SUB-TAB: FINANCIAL TRACKING ══ -->
         <div id="adm-sub-finance" class="adm-subtab">
@@ -2289,6 +2335,136 @@ function switchAdminSubTab(name, btn){
   if(name==='reports') loadAdminYearRequests();
   if(name==='tickets'){ loadTickets(); if(el('ticket-detail'))el('ticket-detail').style.display='none'; if(el('tickets-list'))el('tickets-list').style.display='block'; }
   if(name==='finance') loadFinanceTracker();
+  if(name==='analytics') loadAnalytics(analyticsCurrentDays);
+}
+
+// ════════════════════════════════════════════════════════════
+// ANALYTICS — מעקב מבקרים
+// ════════════════════════════════════════════════════════════
+var analyticsCurrentDays = 30;
+
+const CHANNEL_LABELS = {
+  direct:'🔵 ישיר', search:'🟢 חיפוש (Google)', facebook:'📘 פייסבוק',
+  instagram:'📸 אינסטגרם', linkedin:'💼 LinkedIn', whatsapp:'💬 וואטסאפ',
+  tiktok:'🎵 TikTok', youtube:'▶️ YouTube', email:'📧 מייל',
+  internal:'🔗 פנימי', other:'⚪ אחר', twitter:'🐦 Twitter'
+};
+const DEVICE_LABELS = {desktop:'🖥️ מחשב', mobile:'📱 מובייל', tablet:'📟 טאבלט'};
+const DEVICE_COLORS = {desktop:'var(--blue2)', mobile:'var(--accent)', tablet:'var(--yellow)'};
+
+async function loadAnalytics(days, btn){
+  analyticsCurrentDays = days || 30;
+  if(btn){
+    document.querySelectorAll('.analytics-period').forEach(b=>b.classList.remove('active'));
+    btn.classList.add('active');
+  }
+  const kpis=el('analytics-kpis');
+  if(kpis) kpis.innerHTML='<div style="grid-column:1/-1;color:var(--muted);font-size:12px;padding:8px">טוען...</div>';
+
+  const {data, error} = await sb.rpc('analytics_summary', {p_days: analyticsCurrentDays});
+  if(error){ if(kpis) kpis.innerHTML=`<div style="color:var(--red);font-size:12px;grid-column:1/-1">שגיאה: ${error.message}</div>`; return; }
+
+  renderAnalyticsKPIs(data);
+  renderAnalyticsChart(data.daily_visits || []);
+  renderAnalyticsChannels(data.by_channel || {});
+  renderAnalyticsPages(data.top_pages || []);
+  renderAnalyticsDevices(data.by_device || {});
+}
+
+function renderAnalyticsKPIs(d){
+  const kpis=el('analytics-kpis'); if(!kpis) return;
+  const kpi=(icon,label,val,color,sub)=>
+    `<div class="kpi" style="border-top:3px solid ${color}">
+      <div class="kpi-lbl">${label}</div>
+      <div class="kpi-val" style="color:${color}">${val}</div>
+      ${sub?`<div class="kpi-sub">${sub}</div>`:''}
+    </div>`;
+  kpis.innerHTML =
+    kpi('👁️','ביקורים סה"כ',      d.total_visits||0,     'var(--blue2)',  `היום: ${d.visits_today||0}`)+
+    kpi('👤','מבקרים ייחודיים',    d.unique_sessions||0,  'var(--accent)', `${analyticsCurrentDays} ימים`)+
+    kpi('📨','פניות שנוצרו',       d.total_leads||0,      'var(--purple)', `${analyticsCurrentDays} ימים`)+
+    kpi('🎯','שיעור המרה',         (d.conversion_pct||0)+'%','var(--yellow)',`פניות / מבקרים ייחודיים`);
+}
+
+function renderAnalyticsChart(daily){
+  const cont=el('analytics-chart'); if(!cont) return;
+  if(!daily.length){ cont.innerHTML='<div style="color:var(--muted);font-size:12px;padding:12px">אין נתונים עדיין</div>'; return; }
+  const maxV=Math.max(...daily.map(d=>d.visits),1);
+  cont.innerHTML=daily.map(d=>{
+    const h=Math.max(4,Math.round(d.visits/maxV*140));
+    const hu=Math.max(2,Math.round((d.unique_visitors||0)/maxV*140));
+    const date=new Date(d.day).toLocaleDateString('he-IL',{day:'2-digit',month:'2-digit'});
+    return `<div style="display:flex;flex-direction:column;align-items:center;gap:2px;flex:1;min-width:20px">
+      <div style="display:flex;gap:2px;align-items:flex-end;height:140px">
+        <div style="width:8px;background:var(--blue2);border-radius:2px 2px 0 0;height:${h}px;opacity:.8" title="${d.visits} ביקורים"></div>
+        <div style="width:8px;background:var(--accent);border-radius:2px 2px 0 0;height:${hu}px;opacity:.8" title="${d.unique_visitors||0} ייחודיים"></div>
+      </div>
+      <div style="font-size:9px;color:var(--muted);writing-mode:vertical-rl;transform:rotate(180deg);white-space:nowrap">${date}</div>
+    </div>`;
+  }).join('');
+}
+
+function renderAnalyticsChannels(channels){
+  const cont=el('analytics-channels'); if(!cont) return;
+  const entries=Object.entries(channels).sort((a,b)=>b[1]-a[1]);
+  const total=entries.reduce((s,[,v])=>s+v,0)||1;
+  if(!entries.length){ cont.innerHTML='<div style="color:var(--muted);font-size:12px">אין נתונים</div>'; return; }
+  cont.innerHTML=entries.map(([ch,cnt])=>{
+    const pct=Math.round(cnt/total*100);
+    const label=CHANNEL_LABELS[ch]||ch;
+    return `<div style="margin-bottom:8px">
+      <div style="display:flex;justify-content:space-between;font-size:12px;margin-bottom:3px">
+        <span>${label}</span><span style="font-weight:700">${cnt} (${pct}%)</span>
+      </div>
+      <div style="background:var(--surface);border-radius:4px;height:5px">
+        <div style="width:${pct}%;background:var(--blue2);height:5px;border-radius:4px;transition:.4s"></div>
+      </div>
+    </div>`;
+  }).join('');
+}
+
+function renderAnalyticsPages(pages){
+  const cont=el('analytics-pages'); if(!cont) return;
+  if(!pages.length){ cont.innerHTML='<div style="color:var(--muted);font-size:12px">אין נתונים</div>'; return; }
+  const max=pages[0]?.visits||1;
+  const pageNames={'index.html':'🏠 דף הבית','services.html':'🧩 שירותים','pricing.html':'💳 מחירון',
+    'contact.html':'📞 צור קשר','compliance.html':'🛡️ ציות','accounting.html':'📊 הנהלת חשבונות',
+    'payroll.html':'💰 חשבות שכר','business.html':'💼 ייעוץ עסקי','finance.html':'📈 ייעוץ פיננסי',
+    'marketing.html':'📣 שיווק','sales.html':'🤝 מכירות','about.html':'👤 אודות','faq.html':'❓ שאלות'};
+  cont.innerHTML=pages.map(p=>{
+    const pct=Math.round(p.visits/max*100);
+    const name=pageNames[p.page]||('📄 '+p.page);
+    return `<div style="margin-bottom:7px">
+      <div style="display:flex;justify-content:space-between;font-size:12px;margin-bottom:3px">
+        <span>${name}</span><span style="font-weight:700">${p.visits}</span>
+      </div>
+      <div style="background:var(--surface);border-radius:4px;height:4px">
+        <div style="width:${pct}%;background:var(--purple);height:4px;border-radius:4px"></div>
+      </div>
+    </div>`;
+  }).join('');
+}
+
+function renderAnalyticsDevices(devices){
+  const cont=el('analytics-devices'); if(!cont) return;
+  const entries=Object.entries(devices);
+  const total=entries.reduce((s,[,v])=>s+v,0)||1;
+  if(!entries.length){ cont.innerHTML='<div style="color:var(--muted);font-size:12px">אין נתונים</div>'; return; }
+  cont.innerHTML=entries.map(([dev,cnt])=>{
+    const pct=Math.round(cnt/total*100);
+    const label=DEVICE_LABELS[dev]||dev;
+    const color=DEVICE_COLORS[dev]||'var(--muted)';
+    return `<div style="margin-bottom:10px">
+      <div style="display:flex;justify-content:space-between;font-size:13px;margin-bottom:4px">
+        <span style="font-weight:600">${label}</span>
+        <span style="color:${color};font-weight:700">${pct}%</span>
+      </div>
+      <div style="background:var(--surface);border-radius:4px;height:6px">
+        <div style="width:${pct}%;background:${color};height:6px;border-radius:4px;transition:.4s"></div>
+      </div>
+      <div style="font-size:10px;color:var(--muted);margin-top:2px">${cnt} ביקורים</div>
+    </div>`;
+  }).join('');
 }
 function initAdminTabBar(){
   const ws = el('adm-tab-website');
