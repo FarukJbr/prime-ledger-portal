@@ -1943,6 +1943,8 @@ async function enterPortal(){
   loadAnnouncements();
   loadReminders();
   if(currentUser.role !== 'admin') loadMyTickets();
+  // Track portal visit (anonymous — no PII, just referrer channel)
+  trackPortalVisit();
   if(currentUser.role!=='admin'){
     document.getElementById('chat-widget-btn').style.display='flex';
     ensureMyReferralCode();
@@ -2347,7 +2349,8 @@ const CHANNEL_LABELS = {
   direct:'🔵 ישיר', search:'🟢 חיפוש (Google)', facebook:'📘 פייסבוק',
   instagram:'📸 אינסטגרם', linkedin:'💼 LinkedIn', whatsapp:'💬 וואטסאפ',
   tiktok:'🎵 TikTok', youtube:'▶️ YouTube', email:'📧 מייל',
-  internal:'🔗 פנימי', other:'⚪ אחר', twitter:'🐦 Twitter'
+  website:'🌐 מאתר primels.co.il', internal:'🔗 פנימי',
+  other:'⚪ אחר', twitter:'🐦 Twitter'
 };
 const DEVICE_LABELS = {desktop:'🖥️ מחשב', mobile:'📱 מובייל', tablet:'📟 טאבלט'};
 const DEVICE_COLORS = {desktop:'var(--blue2)', mobile:'var(--accent)', tablet:'var(--yellow)'};
@@ -2430,7 +2433,8 @@ function renderAnalyticsPages(pages){
   const pageNames={'index.html':'🏠 דף הבית','services.html':'🧩 שירותים','pricing.html':'💳 מחירון',
     'contact.html':'📞 צור קשר','compliance.html':'🛡️ ציות','accounting.html':'📊 הנהלת חשבונות',
     'payroll.html':'💰 חשבות שכר','business.html':'💼 ייעוץ עסקי','finance.html':'📈 ייעוץ פיננסי',
-    'marketing.html':'📣 שיווק','sales.html':'🤝 מכירות','about.html':'👤 אודות','faq.html':'❓ שאלות'};
+    'marketing.html':'📣 שיווק','sales.html':'🤝 מכירות','about.html':'👤 אודות','faq.html':'❓ שאלות',
+    'portal':'🔐 פורטל לקוחות'};
   cont.innerHTML=pages.map(p=>{
     const pct=Math.round(p.visits/max*100);
     const name=pageNames[p.page]||('📄 '+p.page);
@@ -2466,6 +2470,39 @@ function renderAnalyticsDevices(devices){
     </div>`;
   }).join('');
 }
+
+// ── PORTAL VISIT TRACKER ──
+// Tracks anonymous visits to the portal — no PII, just channel + device.
+function trackPortalVisit(){
+  try {
+    if(currentUser?.role==='admin') return; // don't track admin
+    const SB_URL='https://urpzikwromhwtuffkhyr.supabase.co';
+    const SB_ANON='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InVycHppa3dyb21od3R1ZmZraHlyIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzk5Njk4MDEsImV4cCI6MjA5NTU0NTgwMX0.lnnmGDSkQ8hPR0QGP2WnJAhDO2qIZSfJWaXh15c7Obo';
+    let sid=sessionStorage.getItem('pl_portal_sid');
+    if(!sid){sid=Math.random().toString(36).slice(2)+Date.now().toString(36);sessionStorage.setItem('pl_portal_sid',sid);}
+    if(sessionStorage.getItem('pl_portal_tracked')) return; // once per session
+    sessionStorage.setItem('pl_portal_tracked','1');
+    const ref=document.referrer||'';
+    const p=new URLSearchParams(location.search);
+    const utmSrc=p.get('utm_source')||'';
+    let ch='direct';
+    if(utmSrc) ch=utmSrc;
+    else if(/primels\.co\.il/i.test(ref)) ch='website'; // came from marketing site ← key metric
+    else if(/google|bing|yahoo/i.test(ref)) ch='search';
+    else if(/facebook/i.test(ref)) ch='facebook';
+    else if(/whatsapp|wa\.me/i.test(ref)) ch='whatsapp';
+    else if(/instagram/i.test(ref)) ch='instagram';
+    else if(ref) ch='other';
+    const ua=navigator.userAgent;
+    const dev=/mobile|iphone|android/i.test(ua)?'mobile':/tablet|ipad/i.test(ua)?'tablet':'desktop';
+    fetch(SB_URL+'/rest/v1/site_visits',{
+      method:'POST',
+      headers:{'Content-Type':'application/json','apikey':SB_ANON,'Authorization':'Bearer '+SB_ANON,'Prefer':'return=minimal'},
+      body:JSON.stringify({page:'portal',channel:ch,device:dev,referrer:ref.slice(0,200),session_id:sid,utm_source:utmSrc})
+    });
+  } catch(e){}
+}
+
 function initAdminTabBar(){
   const ws = el('adm-tab-website');
   if(ws) ws.style.display = hasPermission('manage_website') ? '' : 'none';
