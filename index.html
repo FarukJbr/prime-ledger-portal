@@ -1735,6 +1735,12 @@ const SUPABASE_URL = 'https://urpzikwromhwtuffkhyr.supabase.co';
 const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InVycHppa3dyb21od3R1ZmZraHlyIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzk5Njk4MDEsImV4cCI6MjA5NTU0NTgwMX0.lnnmGDSkQ8hPR0QGP2WnJAhDO2qIZSfJWaXh15c7Obo';
 const sb = window.supabase ? window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY) : null;
 
+// Declared here (before PLAnalytics below) on purpose: PLAnalytics.track() reads
+// currentUser immediately on page load (for page_view/session_start), and a `let`
+// referenced before its own declaration line throws (temporal dead zone) even
+// behind a `typeof` guard — so the declaration has to come first.
+let currentUser = null;
+
 // ══════════════════════════════════════
 // 📊 prime_analytics_events — secure, anon-safe usage analytics.
 // Purely additive: does not read/write any existing table, does not touch RLS,
@@ -1851,7 +1857,6 @@ document.addEventListener('focusin', function(e){
   }
 });
 
-let currentUser = null;
 let usersCache = {}; // admin-panel cache, mirrors public.profiles via admin_list_users() RPC
 const sentWarnings = new Set();
 
@@ -1973,7 +1978,7 @@ async function doLogin(){
     upgradeRequestedAt: profile.upgrade_requested_at,
     staffRole: profile.staff_role||null, permissions: profile.permissions||{}
   };
-  PLAnalytics.track('portal_login');
+  PLAnalytics.track('portal_login', {metadata:{method:'password'}});
   enterPortal();
 }
 
@@ -2072,6 +2077,7 @@ async function tryRestoreSession(){
     upgradeRequestedAt: profile.upgrade_requested_at,
     staffRole: profile.staff_role||null, permissions: profile.permissions||{}
   };
+  PLAnalytics.track('portal_login', {metadata:{method:'session_restore'}});
   enterPortal();
 }
 
