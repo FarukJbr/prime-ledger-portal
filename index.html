@@ -863,6 +863,7 @@ h2{font-size:16px;font-weight:800;margin-bottom:4px}
           <button class="navbtn" onclick="switchAdminSubTab('finance',this)">💰 מעקב פיננסי</button>
           <button class="navbtn" onclick="switchAdminSubTab('analytics',this)">📊 אנליטיקס</button>
           <button class="navbtn" onclick="switchAdminSubTab('feedbackadmin',this)">💡 הצעות</button>
+          <button class="navbtn" onclick="switchAdminSubTab('plansadmin',this)">💳 חבילות</button>
           <button class="navbtn" id="adm-tab-website" style="display:none" onclick="switchAdminSubTab('website',this)">🌐 ניהול אתר</button>
         </div>
 
@@ -1142,6 +1143,19 @@ h2{font-size:16px;font-weight:800;margin-bottom:4px}
             </div>
           </div>
         </div><!-- /adm-sub-analytics -->
+
+        <!-- ══ SUB-TAB: PLANS MANAGEMENT ══ -->
+        <div id="adm-sub-plansadmin" class="adm-subtab">
+          <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px;flex-wrap:wrap;gap:8px">
+            <div style="font-weight:700;font-size:14px">💳 ניהול חבילות פורטל</div>
+            <button class="btn btn-sm" onclick="loadAdminPlans()">🔄 רענן</button>
+          </div>
+          <div style="font-size:12px;color:var(--muted);margin-bottom:12px;padding:8px 12px;background:var(--surface);border-radius:8px">
+            ✏️ ערוך את שם החבילה, המחיר, מגבלת הרישומים והחשבונות. השינויים ייכנסו לתוקף מיידית ללא פריסה מחדש.
+          </div>
+          <div id="admin-plans-list"><div style="color:var(--muted);font-size:12px">טוען...</div></div>
+          <button class="btn btn-sm" style="margin-top:12px;background:var(--blue2);color:#fff;border:none" onclick="addNewPlan()">+ הוסף חבילה</button>
+        </div>
 
         <!-- ══ SUB-TAB: FEEDBACK MANAGEMENT ══ -->
         <div id="adm-sub-feedbackadmin" class="adm-subtab">
@@ -1979,6 +1993,7 @@ async function doLogin(){
     staffRole: profile.staff_role||null, permissions: profile.permissions||{}
   };
   PLAnalytics.track('portal_login', {metadata:{method:'password'}});
+  await loadPortalPlansFromDB();
   enterPortal();
 }
 
@@ -2509,6 +2524,112 @@ function switchAdminSubTab(name, btn){
   if(name==='tickets'){ loadTickets(); if(el('ticket-detail'))el('ticket-detail').style.display='none'; if(el('tickets-list'))el('tickets-list').style.display='block'; }
   if(name==='feedback') loadFeedback();
   if(name==='feedbackadmin') loadAdminFeedback();
+  if(name==='plansadmin') loadAdminPlans();
+}
+
+// ════════════════════════════════════════════════════════════
+// PORTAL PLANS — ניהול חבילות (DB-driven)
+// ════════════════════════════════════════════════════════════
+async function loadPortalPlansFromDB(){
+  if(!sb) return;
+  const {data,error} = await sb.from('portal_plans').select('*').eq('visible',true).order('sort_order');
+  if(!error && data && data.length){
+    data.forEach(p=>{
+      PLANS[p.id]={
+        id:p.id, name:p.name, nameEn:p.name_en||'', icon:p.icon||'📦',
+        price:p.price||0, priceLabel:p.price_label||'חינם', color:p.color||'#64748b',
+        features:{
+          accounts: p.max_accounts||2,
+          records:  p.max_records===0?99999:(p.max_records||50),
+          bankImport:true, reconcile:true, cashflow:true,
+          excel: !!p.excel, print: !!p.print,
+          support: p.support_text||'בסיסית'
+        }
+      };
+    });
+  }
+}
+
+async function loadAdminPlans(){
+  const cont=el('admin-plans-list'); if(!cont) return;
+  cont.innerHTML='<div style="color:var(--muted);font-size:12px">טוען...</div>';
+  const {data,error}=await sb.from('portal_plans').select('*').order('sort_order');
+  if(error||!data){cont.innerHTML=`<div style="color:var(--red);font-size:12px">${error?.message||'שגיאה'}</div>`;return;}
+  cont.innerHTML=data.map(p=>`
+    <div class="card2" style="margin-bottom:12px;border:1px solid var(--border)">
+      <div style="display:flex;align-items:center;gap:10px;margin-bottom:12px">
+        <span style="font-size:22px">${p.icon}</span>
+        <div style="font-weight:700;color:${p.color}">${p.name}</div>
+        <span style="font-size:12px;color:var(--muted)">(${p.id})</span>
+        <label style="margin-right:auto;font-size:12px;display:flex;align-items:center;gap:5px">
+          <input type="checkbox" ${p.visible?'checked':''} onchange="updatePlan('${p.id}','visible',this.checked)"> מוצג
+        </label>
+      </div>
+      <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;margin-bottom:8px">
+        <div><div class="form-label">שם חבילה</div>
+          <input value="${p.name}" onblur="updatePlan('${p.id}','name',this.value)" style="font-size:12px"></div>
+        <div><div class="form-label">מחיר (₪)</div>
+          <input type="number" value="${p.price}" onblur="updatePlan('${p.id}','price',parseInt(this.value)||0)" style="font-size:12px"></div>
+        <div><div class="form-label">תווית מחיר</div>
+          <input value="${p.price_label}" onblur="updatePlan('${p.id}','price_label',this.value)" style="font-size:12px"></div>
+      </div>
+      <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;margin-bottom:8px">
+        <div><div class="form-label">מקס׳ חשבונות</div>
+          <input type="number" value="${p.max_accounts}" onblur="updatePlan('${p.id}','max_accounts',parseInt(this.value)||2)" style="font-size:12px"></div>
+        <div><div class="form-label">מקס׳ רישומים/חודש (0=ללא הגבלה)</div>
+          <input type="number" value="${p.max_records}" onblur="updatePlan('${p.id}','max_records',parseInt(this.value)||50)" style="font-size:12px"></div>
+        <div><div class="form-label">צבע</div>
+          <input type="color" value="${p.color}" onchange="updatePlan('${p.id}','color',this.value)" style="font-size:12px;height:32px"></div>
+      </div>
+      <div style="display:flex;gap:10px;align-items:center">
+        <label style="font-size:12px;display:flex;align-items:center;gap:5px">
+          <input type="checkbox" ${p.excel?'checked':''} onchange="updatePlan('${p.id}','excel',this.checked)"> Excel</label>
+        <label style="font-size:12px;display:flex;align-items:center;gap:5px">
+          <input type="checkbox" ${p.print?'checked':''} onchange="updatePlan('${p.id}','print',this.checked)"> הדפסה/PDF</label>
+        <div style="flex:1"><div class="form-label" style="font-size:11px">תמיכה</div>
+          <input value="${p.support_text}" onblur="updatePlan('${p.id}','support_text',this.value)" style="font-size:12px;width:100%"></div>
+      </div>
+    </div>`).join('');
+}
+
+async function updatePlan(id, field, value){
+  await sb.from('portal_plans').update({[field]:value, updated_at:new Date().toISOString()}).eq('id',id);
+  await loadPortalPlansFromDB();
+  renderPlansTab();
+}
+
+async function addNewPlan(){
+  const id=prompt('מזהה חבילה (אנגלית, ללא רווחים):','business');
+  if(!id) return;
+  await sb.from('portal_plans').insert({id,name:'חבילה חדשה',name_en:id,icon:'📦',price:99,price_label:'₪99/חודש',color:'#0054a8',max_accounts:10,max_records:200,excel:true,print:true,support_text:'מועדפת',sort_order:99});
+  loadAdminPlans();
+}
+
+// ── Notify admin when client hits quota ──
+const _notifiedQuota = new Set();
+async function notifyAdminQuotaReached(user, count, plan){
+  const key = user.email + '-' + new Date().toISOString().slice(0,7); // once per month
+  if(_notifiedQuota.has(key)) return;
+  _notifiedQuota.add(key);
+  try {
+    await fetch('https://portal.primels.co.il/api/send-email',{
+      method:'POST',
+      headers:{'Content-Type':'application/json','x-internal-secret':'pl-internal-2026'},
+      body: JSON.stringify({
+        to: 'Faruq@primesolutionfinance.com',
+        subject: `🔔 לקוח הגיע למגבלת חבילה — ${user.name||user.email}`,
+        html: `<div dir="rtl" style="font-family:Arial;padding:20px">
+          <h2 style="color:#0054a8">לקוח הגיע למגבלת הרישומים</h2>
+          <p><strong>שם:</strong> ${user.name||'—'}</p>
+          <p><strong>אימייל:</strong> ${user.email}</p>
+          <p><strong>חבילה:</strong> ${plan.name} (${plan.features.records} רישומים/חודש)</p>
+          <p><strong>רישומים החודש:</strong> ${count}</p>
+          <p>הלקוח ראה הצעה לשדרוג מנוי.</p>
+          <a href="https://portal.primels.co.il" style="background:#0054a8;color:#fff;padding:10px 20px;border-radius:8px;text-decoration:none;font-weight:700">לפורטל →</a>
+        </div>`
+      })
+    });
+  } catch(e){}
 }
 
 // ════════════════════════════════════════════════════════════
@@ -5846,6 +5967,8 @@ async function addRecord(){
     const thisMonthCount = records.filter(r=>r.created_at && r.created_at >= monthStart).length;
     if(thisMonthCount >= plan.features.records){
       const nextMonth = new Date(now.getFullYear(), now.getMonth()+1, 1).toLocaleDateString('he-IL');
+      // Notify admin via email
+      notifyAdminQuotaReached(currentUser, thisMonthCount, plan);
       openUpgradeModal(`הגעת למכסת הרישומים החודשית במנוי ${plan.name} (${plan.features.records} לחודש).\nב-${nextMonth} תתאפס המכסה ותוכל להוסיף שוב.\nלרישומים ללא הגבלה — שדרג למקצועי.`);
       return;
     }
