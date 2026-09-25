@@ -2651,8 +2651,10 @@ let checkDraft = []; // draft array before confirmation
 function populateCheckAccounts(){
   const sel=el('chk-acct'); if(!sel) return;
   const cur=sel.value;
+  // Checks are only ever drawn from a bank account, never a credit card — so only list
+  // accounts added with type "bank" (the account-type picker's first option) here.
   sel.innerHTML='<option value="">-- ללא --</option>'+
-    accounts.map(a=>`<option value="${a.id}" ${a.id===cur?'selected':''}>${a.name}</option>`).join('');
+    accounts.filter(a=>a.type==='bank').map(a=>`<option value="${a.id}" ${a.id===cur?'selected':''}>${a.name}</option>`).join('');
 }
 
 function addMonths(dateStr, n){
