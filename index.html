@@ -769,7 +769,7 @@ h2{font-size:16px;font-weight:800;margin-bottom:4px}
                 </div>
               </div>
               <div class="form-grid" style="grid-template-columns:1fr 1fr">
-                <div><div class="form-label">תאריך</div><input type="date" id="r-date"></div>
+                <div><div class="form-label">תאריך עסקה</div><input type="date" id="r-date"></div>
                 <div><div class="form-label">חשבון</div><select id="r-acct"><option value="">-- ללא --</option></select></div>
               </div>
               <div class="form-grid"><div><div class="form-label">תיאור</div><input type="text" id="r-desc" placeholder="תיאור הפעולה"></div></div>
@@ -785,6 +785,13 @@ h2{font-size:16px;font-weight:800;margin-bottom:4px}
                 <select id="flt-bp" onchange="renderRecords()" style="width:auto;font-size:12px;padding:4px 7px"><option value="">עסקי+פרטי</option><option value="biz">עסקי</option><option value="priv">פרטי</option></select>
                 <select id="flt-acct" onchange="renderRecords()" style="width:auto;font-size:12px;padding:4px 7px"><option value="">כל החשבונות</option></select>
                 <select id="flt-cat" onchange="renderRecords()" style="width:auto;font-size:12px;padding:4px 7px"><option value="">כל הקטגוריות</option></select>
+                <div style="display:flex;align-items:center;gap:4px;font-size:12px">
+                  <span style="color:var(--muted)">מ:</span>
+                  <input type="date" id="flt-date-from" onchange="renderRecords()" style="font-size:12px;padding:3px 6px;border:1px solid var(--border);border-radius:6px;background:var(--card)">
+                  <span style="color:var(--muted)">עד:</span>
+                  <input type="date" id="flt-date-to" onchange="renderRecords()" style="font-size:12px;padding:3px 6px;border:1px solid var(--border);border-radius:6px;background:var(--card)">
+                  <button onclick="clearDateFilter()" style="background:none;border:1px solid var(--border);border-radius:6px;padding:3px 7px;font-size:11px;cursor:pointer;color:var(--muted)">✕</button>
+                </div>
               </div>
             </div>
             <div id="rec-monthly-usage" style="margin-bottom:8px"></div>
@@ -795,7 +802,7 @@ h2{font-size:16px;font-weight:800;margin-bottom:4px}
             <div class="card">
               <div class="sec-title"><span>רישומים</span><span id="rec-count" style="color:var(--muted);font-size:11px"></span></div>
               <div class="tbl-wrap"><table class="tbl">
-                <thead><tr><th>תאריך קבלה</th><th>תאריך הוספה</th><th>תיאור</th><th>קטגוריה</th><th>סוג</th><th>ע/פ</th><th>חשבון</th><th>סכום</th><th>סטטוס</th><th class="no-print"></th></tr></thead>
+                <thead><tr><th>תאריך עסקה</th><th>תאריך הוספה</th><th>תיאור</th><th>קטגוריה</th><th>סוג</th><th>ע/פ</th><th>חשבון</th><th>סכום</th><th>סטטוס</th><th class="no-print"></th></tr></thead>
                 <tbody id="rec-tbody"><tr><td colspan="10" style="color:var(--muted);text-align:center;padding:14px">אין רישומים</td></tr></tbody>
               </table></div>
             </div>
@@ -6003,13 +6010,29 @@ function deleteRecord(id){
   if(r && (r.recurringItemId || r.loanId || (r.id&&r.id.startsWith('wa-'))) && sb) sb.from('portal_records').delete().eq('id',id).then(({error})=>{ if(error) console.error('delete auto-posted record error',error); });
   save(); refreshAll();
 }
+function clearDateFilter(){
+  const f=el('flt-date-from'), t=el('flt-date-to');
+  if(f) f.value=''; if(t) t.value='';
+  renderRecords();
+}
+
 function renderRecords(){
   const usage=currentUser?currentUser.usage||'biz':'biz';
   const ft=el("flt-type")?el("flt-type").value:"";
   const fb=usage==='priv'?'priv':(el("flt-bp")?el("flt-bp").value:"");
   const fa=el("flt-acct")?el("flt-acct").value:"";
   const fc=el("flt-cat")?el("flt-cat").value:"";
-  let f=records.filter(r=>(!ft||r.type===ft)&&(!fb||r.bp===fb)&&(!fa||r.acctId===fa)&&(!fc||r.category===fc));
+  const fdFrom=el("flt-date-from")?el("flt-date-from").value:"";
+  const fdTo=el("flt-date-to")?el("flt-date-to").value:"";
+  let f=records.filter(r=>{
+    if(ft && r.type!==ft) return false;
+    if(fb && r.bp!==fb) return false;
+    if(fa && r.acctId!==fa) return false;
+    if(fc && r.category!==fc) return false;
+    if(fdFrom && r.date && r.date < fdFrom) return false;
+    if(fdTo && r.date && r.date > fdTo) return false;
+    return true;
+  });
   if(el("rec-count")) el("rec-count").textContent=f.length+" רישומים | "+fmt(f.reduce((s,r)=>s+(r.type==="הוצאה"?-r.amount:r.amount),0));
   const tb=el("rec-tbody"); if(!tb) return;
   if(!f.length){tb.innerHTML=`<tr><td colspan="10" style="color:var(--muted);text-align:center;padding:14px">אין רישומים</td></tr>`;return;}
