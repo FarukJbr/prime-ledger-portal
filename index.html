@@ -6536,6 +6536,14 @@ function renderReconcile(){
 }
 
 // ── FILE IMPORT ──
+// NOTE: several Israeli banks (Bank Leumi included) let clients "export to Excel" a statement
+// that is actually an HTML page saved with an .xls/.xlsx extension — not a real binary
+// spreadsheet. XLSX.read() cannot parse that reliably (it either finds nothing or grabs the
+// wrong nested table), which is why some bank exports silently imported 0 rows or one garbled
+// row. handleFile() now sniffs the file's actual bytes and routes HTML exports through
+// parseHtmlBankTable() below, which finds the transactions table by its Hebrew column headers
+// and hands parseBankData() the same array-of-arrays shape as a real Format-A spreadsheet, so
+// parseBankData()'s own matching/dedupe/upload-history logic is untouched.
 function handleDrop(e){e.preventDefault();if(el("dropzone"))el("dropzone").classList.remove("drag");handleFile(e.dataTransfer.files[0]);}
 function handleFile(file){
   if(!file) return;
@@ -6544,11 +6552,60 @@ function handleFile(file){
   const acctId=el("import-acct-sel").value, bp=el("import-bp").value;
   const reader=new FileReader();
   reader.onload=ev=>{
-    const wb=XLSX.read(ev.target.result,{type:"binary",cellDates:true});
-    const ws=wb.Sheets[wb.SheetNames[0]];
-    parseBankData(XLSX.utils.sheet_to_json(ws,{header:1,raw:false,dateNF:"yyyy-mm-dd"}),acctId,bp,file.name,file.size);
+    const buf=ev.target.result;
+    const head=new TextDecoder("utf-8").decode(buf.slice(0,2048)).trim();
+    let data;
+    try{
+      if(/^<(!doctype|html)/i.test(head)){
+        data=parseHtmlBankTable(new TextDecoder("utf-8").decode(buf));
+      }else{
+        const wb=XLSX.read(buf,{type:"array",cellDates:true});
+        const ws=wb.Sheets[wb.SheetNames[0]];
+        data=XLSX.utils.sheet_to_json(ws,{header:1,raw:false,dateNF:"yyyy-mm-dd"});
+      }
+    }catch(err){
+      alert("לא הצלחתי לקרוא את הקובץ. ודא שזהו קובץ Excel/HTML תקין שיוצא מהבנק.");
+      return;
+    }
+    parseBankData(data,acctId,bp,file.name,file.size);
   };
-  reader.readAsBinaryString(file);
+  reader.readAsArrayBuffer(file);
+}
+// Locates the real transactions table inside a bank-exported HTML "Excel" file by its Hebrew
+// header row (תאריך / תיאור / בחובה / בזכות / אסמכתא / תאריך ערך), rather than assuming a fixed
+// position, and returns rows in the same [date, valueDate, desc, ref, debit, credit] shape
+// parseBankData()'s Format A already expects. Uses row.cells (direct <td> children only) — not
+// querySelectorAll("td"), which would also pick up cells from nested layout tables and corrupt
+// the column mapping.
+function parseHtmlBankTable(html){
+  const HDR={date:["תאריך"],desc:["תיאור","פרטים"],ref:["אסמכתא"],debit:["בחובה","חובה","חיוב"],credit:["בזכות","זכות","זיכוי"],valueDate:["תאריך ערך"]};
+  const matchHdr=(t,list,exact)=>{t=(t||"").trim();if(!t||t.length>40)return false;return list.some(k=>exact?t===k:t.includes(k))};
+  const doc=new DOMParser().parseFromString(html,"text/html");
+  const rows=[...doc.querySelectorAll("tr")];
+  let headerIdx=-1,map=null;
+  for(let i=0;i<rows.length;i++){
+    const cells=[...rows[i].cells].map(c=>c.textContent.trim());
+    const m={};
+    cells.forEach((t,idx)=>{
+      if(m.date===undefined&&matchHdr(t,HDR.date,true))m.date=idx;
+      else if(m.valueDate===undefined&&matchHdr(t,HDR.valueDate))m.valueDate=idx;
+      else if(m.desc===undefined&&matchHdr(t,HDR.desc))m.desc=idx;
+      else if(m.ref===undefined&&matchHdr(t,HDR.ref))m.ref=idx;
+      else if(m.debit===undefined&&matchHdr(t,HDR.debit))m.debit=idx;
+      else if(m.credit===undefined&&matchHdr(t,HDR.credit))m.credit=idx;
+    });
+    if(m.date!==undefined&&m.desc!==undefined&&(m.debit!==undefined||m.credit!==undefined)){headerIdx=i;map=m;break}
+  }
+  if(headerIdx<0)throw new Error("no header row found");
+  const out=[];
+  for(let i=headerIdx+1;i<rows.length;i++){
+    const cells=[...rows[i].cells].map(c=>c.textContent.trim());
+    if(cells.length<=Math.max(map.date,map.desc))continue;
+    const date=cells[map.date];
+    if(!/^\d{1,2}[\/\-.]\d{1,2}[\/\-.]\d{4}/.test(date))continue;
+    out.push([date,map.valueDate!==undefined?cells[map.valueDate]:date,cells[map.desc]||"",map.ref!==undefined?cells[map.ref]||"":"",cells[map.debit]||"0",cells[map.credit]||"0"]);
+  }
+  return out;
 }
 function parseBankData(data,acctId,bp,fileName,fileSize){
   let added=0, dupes=0;
