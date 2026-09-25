@@ -512,6 +512,7 @@ h2{font-size:16px;font-weight:800;margin-bottom:4px}
       <button class="side-btn" id="wealth-sb-btn" onclick="switchPortalTab('wealth',this)"><span class="side-icon">🏛️</span> הצהרת הון</button>
       <button class="side-btn" onclick="switchPortalTab('tickets',this)" id="tickets-sb-btn"><span class="side-icon">📬</span> הפניות שלי <span class="side-badge" id="tickets-sb-badge" style="display:none">0</span></button>
       <button class="side-btn" onclick="switchPortalTab('feedback',this)" id="feedback-sb-btn"><span class="side-icon">💡</span> הצעות ומשוב</button>
+      <button class="side-btn" onclick="switchPortalTab('checks',this)" id="checks-sb-btn"><span class="side-icon">🏦</span> צ'קים עתידיים <span class="side-badge" id="checks-sb-badge" style="display:none">0</span></button>
       <div class="sidebar-section" id="admin-sb-section" style="display:none">ניהול מנהל</div>
       <button class="side-btn" id="admin-sb-btn" style="display:none" onclick="switchPortalTab('admin',this)"><span class="side-icon">👑</span> פאנל מנהל <span class="side-badge" id="admin-badge-count" style="display:none">0</span></button>
       <div class="sidebar-section">מידע</div>
@@ -1437,6 +1438,106 @@ h2{font-size:16px;font-weight:800;margin-bottom:4px}
         </div>
       </div>
 
+      <!-- CHECKS TAB -->
+      <div id="ptab-checks" class="portal-tab">
+        <h2>🏦 צ'קים עתידיים</h2>
+        <p style="color:var(--muted);font-size:13px;margin-bottom:16px">רישום ומעקב אחר צ'קים עתידיים. כשמגיע תאריך הפרעון — הצ'ק נרשם אוטומטית ברישומים.</p>
+
+        <!-- STEP 1: FORM -->
+        <div id="chk-step-form">
+          <div class="card no-print" style="margin-bottom:14px">
+            <div class="sec-title">📝 הוספת סדרת צ'קים</div>
+            <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:10px">
+              <div><div class="form-label">שם מוטב (לפקודת מי)</div>
+                <input id="chk-payee" placeholder="שם הספק / בעל הנכס..."></div>
+              <div><div class="form-label">חשבון בנק</div>
+                <select id="chk-acct"><option value="">-- ללא --</option></select></div>
+            </div>
+            <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px;margin-bottom:10px">
+              <div><div class="form-label">מספר צ'קים</div>
+                <input type="number" id="chk-count" value="1" min="1" max="60" oninput="updateCheckPreview()"></div>
+              <div><div class="form-label">תאריך פרעון ראשון</div>
+                <input type="date" id="chk-start-date" oninput="updateCheckPreview()"></div>
+              <div><div class="form-label">מרווח בין צ'קים</div>
+                <select id="chk-interval" onchange="updateCheckPreview()">
+                  <option value="month">כל חודש</option>
+                  <option value="week">כל שבוע</option>
+                  <option value="2weeks">כל שבועיים</option>
+                  <option value="quarter">כל רבעון</option>
+                  <option value="custom">תאריכים ידניים</option>
+                </select></div>
+            </div>
+            <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px;margin-bottom:10px">
+              <div><div class="form-label">סכום לצ'ק (₪)</div>
+                <input type="number" id="chk-amount" placeholder="0.00" oninput="updateCheckPreview()"></div>
+              <div><div class="form-label">מספר צ'ק ראשון (אופציונלי)</div>
+                <input type="number" id="chk-num-start" placeholder="לדוגמה: 1001" oninput="updateCheckPreview()"></div>
+              <div><div class="form-label">קטגוריה</div>
+                <select id="chk-cat">
+                  <option value="צ׳קים">צ'קים</option>
+                  <option value="שכירות">שכירות</option>
+                  <option value="ספקים">ספקים</option>
+                  <option value="הלוואה">הלוואה</option>
+                  <option value="אחר עסקי">אחר</option>
+                </select></div>
+            </div>
+            <div style="margin-bottom:12px">
+              <div class="form-label">הערה (אופציונלי)</div>
+              <input id="chk-note" placeholder="הערה על הסדרה...">
+            </div>
+            <button class="btn-solid" onclick="showCheckDraft()">👁️ טיוטה לאישור</button>
+          </div>
+
+          <!-- DRAFT PREVIEW -->
+          <div id="chk-draft" style="display:none">
+            <div class="card" style="margin-bottom:14px">
+              <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;flex-wrap:wrap;gap:8px">
+                <div class="sec-title" style="margin:0">📋 טיוטת צ'קים — אשר לפני הרישום</div>
+                <div style="display:flex;gap:8px">
+                  <button class="btn btn-sm" style="background:#ef4444;color:#fff;border:none" onclick="cancelCheckDraft()">✕ בטל</button>
+                  <button class="btn btn-sm" style="background:var(--accent);color:#fff;border:none" onclick="confirmChecks()">✅ אשר ורשום</button>
+                </div>
+              </div>
+              <div id="chk-draft-summary" style="font-size:13px;color:var(--muted);margin-bottom:10px"></div>
+              <div class="tbl-wrap">
+                <table class="tbl" id="chk-draft-table">
+                  <thead><tr>
+                    <th>#</th><th>מוטב</th><th>מספר צ'ק</th><th>תאריך פרעון</th><th>סכום</th><th>עריכה</th>
+                  </tr></thead>
+                  <tbody id="chk-draft-tbody"></tbody>
+                </table>
+              </div>
+              <div style="display:flex;justify-content:flex-end;gap:8px;margin-top:12px">
+                <button class="btn btn-sm" style="background:#ef4444;color:#fff;border:none" onclick="cancelCheckDraft()">✕ בטל</button>
+                <button class="btn btn-sm" style="background:var(--accent);color:#fff;border:none" onclick="confirmChecks()">✅ אשר ורשום</button>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- CHECKS LIST -->
+        <div class="card">
+          <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;flex-wrap:wrap;gap:8px">
+            <div class="sec-title" style="margin:0">רשימת צ'קים <span id="chk-count-lbl" style="color:var(--muted);font-size:11px"></span></div>
+            <div style="display:flex;gap:6px;flex-wrap:wrap">
+              <select id="chk-flt-status" onchange="renderChecksList()" style="font-size:12px;padding:3px 7px">
+                <option value="">כל הסטטוסים</option>
+                <option value="pending">⏳ ממתין</option>
+                <option value="posted">✅ נפרע</option>
+                <option value="cancelled">❌ בוטל</option>
+              </select>
+              <button class="btn btn-sm" onclick="loadChecks()">🔄 רענן</button>
+            </div>
+          </div>
+          <div class="tbl-wrap">
+            <table class="tbl">
+              <thead><tr><th>מוטב</th><th>מספר צ'ק</th><th>תאריך פרעון</th><th>סכום</th><th>חשבון</th><th>קטגוריה</th><th>סטטוס</th><th class="no-print"></th></tr></thead>
+              <tbody id="chk-list-tbody"><tr><td colspan="8" style="color:var(--muted);text-align:center;padding:14px">אין צ'קים רשומים</td></tr></tbody>
+            </table>
+          </div>
+        </div>
+      </div><!-- /ptab-checks -->
+
       <!-- FEEDBACK TAB -->
       <div id="ptab-feedback" class="portal-tab">
         <h2>💡 הצעות ומשוב</h2>
@@ -2136,6 +2237,8 @@ async function enterPortal(){
   if(currentUser.role !== 'admin') loadMyTickets();
   // Track portal visit (anonymous — no PII, just referrer channel)
   trackPortalVisit();
+  // Auto-check and post overdue checks
+  setTimeout(()=>{ if(currentUser?.role!=='admin') loadChecks(); }, 2000);
   if(currentUser.role!=='admin'){
     document.getElementById('chat-widget-btn').style.display='flex';
     ensureMyReferralCode();
@@ -2530,8 +2633,239 @@ function switchAdminSubTab(name, btn){
   if(name==='reports') loadAdminYearRequests();
   if(name==='tickets'){ loadTickets(); if(el('ticket-detail'))el('ticket-detail').style.display='none'; if(el('tickets-list'))el('tickets-list').style.display='block'; }
   if(name==='feedback') loadFeedback();
+  if(name==='checks') { populateCheckAccounts(); loadChecks(); }
   if(name==='feedbackadmin') loadAdminFeedback();
   if(name==='plansadmin') loadAdminPlans();
+}
+
+// ════════════════════════════════════════════════════════════
+// CHECKS — צ'קים עתידיים
+// ════════════════════════════════════════════════════════════
+let checkDraft = []; // draft array before confirmation
+
+function populateCheckAccounts(){
+  const sel=el('chk-acct'); if(!sel) return;
+  const cur=sel.value;
+  sel.innerHTML='<option value="">-- ללא --</option>'+
+    accounts.map(a=>`<option value="${a.id}" ${a.id===cur?'selected':''}>${a.name}</option>`).join('');
+}
+
+function addMonths(dateStr, n){
+  const d=new Date(dateStr); d.setMonth(d.getMonth()+n); return d.toISOString().slice(0,10);
+}
+function addDays(dateStr, n){
+  const d=new Date(dateStr); d.setDate(d.getDate()+n); return d.toISOString().slice(0,10);
+}
+
+function generateDates(startDate, count, interval){
+  const dates=[];
+  for(let i=0;i<count;i++){
+    if(interval==='month')   dates.push(addMonths(startDate,i));
+    else if(interval==='week')   dates.push(addDays(startDate,i*7));
+    else if(interval==='2weeks') dates.push(addDays(startDate,i*14));
+    else if(interval==='quarter')dates.push(addMonths(startDate,i*3));
+    else dates.push(addDays(startDate,i*30)); // custom fallback
+  }
+  return dates;
+}
+
+function showCheckDraft(){
+  const payee=el('chk-payee')?.value.trim();
+  const count=parseInt(el('chk-count')?.value)||1;
+  const startDate=el('chk-start-date')?.value;
+  const interval=el('chk-interval')?.value||'month';
+  const amount=parseFloat(el('chk-amount')?.value)||0;
+  const numStart=el('chk-num-start')?.value.trim();
+  const cat=el('chk-cat')?.value||'צ\'קים';
+  const note=el('chk-note')?.value.trim()||'';
+  const acctId=el('chk-acct')?.value||'';
+
+  if(!payee){alert('נא למלא שם מוטב');return;}
+  if(!startDate){alert('נא לבחור תאריך ראשון');return;}
+  if(!amount||amount<=0){alert('נא להזין סכום');return;}
+
+  const dates=generateDates(startDate,count,interval);
+  const seriesId='chk-'+Date.now();
+  checkDraft=dates.map((date,i)=>({
+    _draftIdx: i,
+    seriesId, payee, amount,
+    checkNumber: numStart?(parseInt(numStart)+i).toString():'',
+    dueDate: date, acctId, category:cat,
+    note: note, bp:'biz', status:'pending'
+  }));
+
+  renderCheckDraftTable();
+  el('chk-draft').style.display='block';
+  el('chk-draft').scrollIntoView({behavior:'smooth'});
+
+  const total=checkDraft.reduce((s,c)=>s+c.amount,0);
+  if(el('chk-draft-summary')){
+    el('chk-draft-summary').innerHTML=`
+      <strong>סה"כ:</strong> ${count} צ'קים לפקודת <strong>${payee}</strong> |
+      סכום כולל: <strong style="color:var(--red)">${fmt(total)}</strong> |
+      ראשון: ${checkDraft[0]?.dueDate} | אחרון: ${checkDraft[count-1]?.dueDate}`;
+  }
+}
+
+function renderCheckDraftTable(){
+  const tbody=el('chk-draft-tbody'); if(!tbody) return;
+  tbody.innerHTML=checkDraft.map((c,i)=>`
+    <tr id="chk-draft-row-${i}">
+      <td style="color:var(--muted)">${i+1}</td>
+      <td><input value="${c.payee}" onblur="checkDraft[${i}].payee=this.value" style="font-size:12px;min-width:120px"></td>
+      <td><input value="${c.checkNumber}" placeholder="מספר צ'ק" onblur="checkDraft[${i}].checkNumber=this.value" style="font-size:12px;width:80px"></td>
+      <td><input type="date" value="${c.dueDate}" onblur="checkDraft[${i}].dueDate=this.value" style="font-size:12px"></td>
+      <td><input type="number" value="${c.amount}" onblur="checkDraft[${i}].amount=parseFloat(this.value)||0;updateDraftSummary()" style="font-size:12px;width:90px"></td>
+      <td><button class="btn btn-sm" style="background:#ef4444;color:#fff;border:none;padding:2px 7px" onclick="removeDraftRow(${i})">✕</button></td>
+    </tr>`).join('');
+}
+
+function updateDraftSummary(){
+  const total=checkDraft.reduce((s,c)=>s+c.amount,0);
+  const s=el('chk-draft-summary');
+  if(s) s.innerHTML=s.innerHTML.replace(/סה"כ כולל:.*?(?=\||$)/,`סה"כ כולל: <strong style="color:var(--red)">${fmt(total)}</strong>`);
+}
+
+function removeDraftRow(i){
+  checkDraft.splice(i,1);
+  checkDraft.forEach((c,j)=>c._draftIdx=j);
+  renderCheckDraftTable();
+}
+
+function cancelCheckDraft(){
+  checkDraft=[];
+  el('chk-draft').style.display='none';
+}
+
+async function confirmChecks(){
+  if(!checkDraft.length){alert('אין צ\'קים לאישור');return;}
+  if(!confirm(`לאשר ולרשום ${checkDraft.length} צ'קים?`)) return;
+
+  const rows=checkDraft.map(c=>({
+    client_email: currentUser.email,
+    series_id: c.seriesId,
+    payee: c.payee,
+    amount: c.amount,
+    check_number: c.checkNumber||'',
+    due_date: c.dueDate,
+    acct_id: c.acctId||null,
+    category: c.category,
+    bp: c.bp,
+    note: c.note,
+    status: 'pending'
+  }));
+
+  const {error}=await sb.from('portal_checks').insert(rows);
+  if(error){alert('שגיאה: '+error.message);return;}
+
+  checkDraft=[];
+  el('chk-draft').style.display='none';
+  // Clear form
+  ['chk-payee','chk-count','chk-start-date','chk-amount','chk-num-start','chk-note'].forEach(id=>{
+    const e=el(id); if(e) e.value=id==='chk-count'?'1':'';
+  });
+
+  alert(`✅ ${rows.length} צ'קים נרשמו בהצלחה!`);
+  loadChecks();
+  // Update badge
+  updateChecksBadge();
+}
+
+async function loadChecks(){
+  if(!sb||!currentUser) return;
+  const {data,error}=await sb.from('portal_checks')
+    .select('*')
+    .eq('client_email',currentUser.email)
+    .order('due_date',{ascending:true});
+  if(error) return;
+
+  // Auto-post overdue pending checks
+  const today=new Date().toISOString().slice(0,10);
+  const toPost=(data||[]).filter(c=>c.status==='pending'&&c.due_date<=today);
+  for(const c of toPost){ await postCheck(c); }
+
+  renderChecksList(data||[]);
+  updateChecksBadge(data||[]);
+}
+
+async function postCheck(chk){
+  // Create a record for the check
+  const rec={
+    id:'chk-'+chk.id,
+    date:chk.due_date,
+    created_at:new Date().toISOString(),
+    description:`צ'ק לפקודת ${chk.payee}${chk.check_number?' מס׳ '+chk.check_number:''}`,
+    amount:chk.amount,
+    type:'הוצאה',
+    bp:chk.bp||'biz',
+    category:chk.category||'צ\'קים',
+    acctId:chk.acct_id||null,
+    matched:false
+  };
+  // Add to records array (will be synced in next save)
+  if(!records.find(r=>r.id===rec.id)) {
+    records.push(rec);
+    await save();
+  }
+  // Mark check as posted
+  await sb.from('portal_checks').update({status:'posted',record_id:rec.id}).eq('id',chk.id);
+  showToast('✅ צ\'ק נפרע',`צ'ק לפקודת ${chk.payee} (${fmt(chk.amount)}) נרשם ברישומים`,'var(--accent)');
+}
+
+function renderChecksList(data){
+  const tbody=el('chk-list-tbody'); if(!tbody) return;
+  const fStatus=el('chk-flt-status')?.value||'';
+  let rows=(data||[]);
+  if(fStatus) rows=rows.filter(c=>c.status===fStatus);
+
+  if(el('chk-count-lbl')) el('chk-count-lbl').textContent=
+    rows.length+' צ\'קים | סה"כ: '+fmt(rows.filter(c=>c.status==='pending').reduce((s,c)=>s+Number(c.amount),0))+' ממתינים';
+
+  if(!rows.length){tbody.innerHTML='<tr><td colspan="8" style="color:var(--muted);text-align:center;padding:14px">אין צ\'קים</td></tr>';return;}
+
+  const today=new Date().toISOString().slice(0,10);
+  tbody.innerHTML=rows.map(c=>{
+    const isOverdue=c.status==='pending'&&c.due_date<today;
+    const isDueSoon=c.status==='pending'&&c.due_date>=today&&c.due_date<=addDays(today,7);
+    const st=c.status==='posted'?'<span class="badge bg">✅ נפרע</span>':
+              c.status==='cancelled'?'<span class="badge br">❌ בוטל</span>':
+              isOverdue?'<span class="badge br">⚠️ פג תוקף</span>':
+              isDueSoon?'<span class="badge by">⏰ בקרוב</span>':
+              '<span class="badge by">⏳ ממתין</span>';
+    return `<tr style="${isOverdue?'background:#fff5f5':''}">
+      <td style="font-weight:600">${c.payee}</td>
+      <td style="color:var(--muted)">${c.check_number||'—'}</td>
+      <td style="color:${isOverdue?'var(--red)':isDueSoon?'var(--yellow)':'inherit'};font-weight:${isOverdue||isDueSoon?'700':'400'}">${c.due_date}</td>
+      <td style="color:var(--red);font-weight:700">${fmt(Number(c.amount))}</td>
+      <td style="font-size:12px">${c.acct_id?aN(c.acct_id):'—'}</td>
+      <td style="font-size:12px">${c.category||'—'}</td>
+      <td>${st}</td>
+      <td class="no-print">
+        ${c.status==='pending'?`<button class="btn btn-sm" onclick="manualPostCheck('${c.id}','${c.payee}',${c.amount},'${c.due_date}','${c.acct_id||''}','${c.category||''}','${c.check_number||''}')" style="font-size:11px">💳 רשום עכשיו</button>
+        <button class="btn btn-sm" style="font-size:11px;background:#ef4444;color:#fff;border:none;margin-right:4px" onclick="cancelCheck('${c.id}')">❌</button>`:''}
+      </td>
+    </tr>`;
+  }).join('');
+}
+
+async function manualPostCheck(id,payee,amount,dueDate,acctId,category,checkNum){
+  if(!confirm(`לרשום צ'ק לפקודת ${payee} (${fmt(amount)}) כהוצאה?`)) return;
+  const chk={id,payee,amount:Number(amount),due_date:dueDate,acct_id:acctId||null,category,check_number:checkNum,bp:'biz'};
+  await postCheck(chk);
+  loadChecks();
+}
+
+async function cancelCheck(id){
+  if(!confirm('לבטל את הצ\'ק?')) return;
+  await sb.from('portal_checks').update({status:'cancelled'}).eq('id',id);
+  loadChecks();
+}
+
+function updateChecksBadge(data){
+  const badge=el('checks-sb-badge'); if(!badge) return;
+  const pending=(data||[]).filter(c=>c.status==='pending').length;
+  if(pending>0){badge.textContent=pending;badge.style.display='inline-block';}
+  else badge.style.display='none';
 }
 
 // ════════════════════════════════════════════════════════════
