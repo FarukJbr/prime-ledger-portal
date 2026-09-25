@@ -4908,8 +4908,23 @@ const COUT_BIZ=["שכירות עסקי","שכר עובדים","דלק עסקי",
 const COUT_PRI=["שכירות","מזון/סופרמרקט","דלק פרטי","הוצאות רכב","תחזוקת רכב","ביטוח רכב","חניה","חשמל","מים/ארנונה","טלפון","ביטוח פרטי","בריאות/תרופות","חינוך","פנאי/בידור","בגדים","כלי בית/ריהוט","חתונות/אירועים","החזר הלוואה/משכנתא","מנויים (סטרימינג/חבר)","אחר פרטי"];
 const CIN_BIZ=["הכנסות לקוחות","שכר/משכורת","דמי ניהול","השקעות","מענקים","החזרים","אחר הכנסה עסקי"];
 const CIN_PRI=["משכורת","קצבה",'שכ"ד',"ריבית/דיבידנד","מתנות","החזר מס","אחר הכנסה פרטי"];
+// Robust date parser: accepts Date objects, ISO ("yyyy-mm-dd"), or Israeli-style
+// ("dd/mm/yyyy", "dd-mm-yyyy", "dd.mm.yyyy") strings. Bank exports, manual entry, and different
+// banks' Excel/HTML formats never agree on one date format, so every comparison, sort, and
+// cashflow bucket goes through this instead of the browser's native Date parser (which assumes
+// MM/DD for slash-separated dates and silently mis-parses or nulls out DD/MM dates).
+function parseDateFlexible(d){
+  if(d instanceof Date) return isNaN(d)?null:d;
+  const s=String(d||"").trim();
+  let m=s.match(/^(\d{4})-(\d{1,2})-(\d{1,2})/);
+  if(m) return new Date(+m[1],+m[2]-1,+m[3]);
+  m=s.match(/^(\d{1,2})[\/\-.](\d{1,2})[\/\-.](\d{4})/);
+  if(m) return new Date(+m[3],+m[2]-1,+m[1]);
+  const dt=new Date(s);
+  return isNaN(dt)?null:dt;
+}
 const fmt=n=>new Intl.NumberFormat("he-IL",{style:"currency",currency:"ILS",maximumFractionDigits:0}).format(n||0);
-const fmtD=d=>{if(!d)return"";if(d instanceof Date&&!isNaN(d))return d.toLocaleDateString("he-IL");return String(d).slice(0,10);};
+const fmtD=d=>{if(!d)return"";const dt=parseDateFlexible(d);return dt?dt.toLocaleDateString("he-IL"):String(d).slice(0,10);};
 const el=id=>document.getElementById(id);
 const getA=id=>accounts.find(a=>a.id===id);
 const aC=id=>{const a=getA(id);return a?a.color:"var(--muted)";};
@@ -6371,7 +6386,7 @@ function renderRecords(){
   const tb=el("rec-tbody"); if(!tb) return;
   if(!f.length){tb.innerHTML=`<tr><td colspan="10" style="color:var(--muted);text-align:center;padding:14px">אין רישומים</td></tr>`;return;}
   const dups=findDuplicates(); const dupIds=new Set(dups.filter(d=>d.type==="records").flatMap(d=>[d.a,d.b]));
-  tb.innerHTML=f.sort((a,b)=>b.date.localeCompare(a.date)).map(r=>{
+  tb.innerHTML=f.sort((a,b)=>(parseDateFlexible(b.date)?.getTime()||0)-(parseDateFlexible(a.date)?.getTime()||0)).map(r=>{
     const addedAt = r.created_at ? new Date(r.created_at).toLocaleDateString('he-IL') : '—';
     return `<tr>
     <td>${r.date}</td>
@@ -6486,7 +6501,7 @@ function renderReconcile(){
   if(el("rec-col-stats")) el("rec-col-stats").innerHTML=`<span style="color:#10b981">הכנסות: ${fmt(unmRecs.filter(r=>r.type==="הכנסה").reduce((s,r)=>s+r.amount,0))}</span><span style="color:#ef4444">הוצאות: ${fmt(unmRecs.filter(r=>r.type==="הוצאה").reduce((s,r)=>s+r.amount,0))}</span>`;
   if(el("rec-col-body")){
     if(!unmRecs.length) el("rec-col-body").innerHTML=`<div style="color:var(--muted);font-size:12px;text-align:center;padding:20px">✓ כל הרישומים מותאמים</div>`;
-    else el("rec-col-body").innerHTML=unmRecs.sort((a,b)=>b.date.localeCompare(a.date)).map(r=>{
+    else el("rec-col-body").innerHTML=unmRecs.sort((a,b)=>(parseDateFlexible(b.date)?.getTime()||0)-(parseDateFlexible(a.date)?.getTime()||0)).map(r=>{
       const isSel=selRec===r.id, isDup=dupRecIds.has(r.id);
       return`<div class="rec-item rec-item-rec${isSel?" selected":""}${isDup?" dup-flag":""}" onclick="selectRecItem('${r.id}')">
         ${isDup?`<span class="badge" style="background:#ef444430;color:#ff6b6b;position:absolute;top:6px;left:6px">כפיל!</span>`:""}
@@ -6503,7 +6518,7 @@ function renderReconcile(){
   if(el("bank-col-stats")) el("bank-col-stats").innerHTML=`<span style="color:#10b981">זיכויים: ${fmt(unmBank.reduce((s,r)=>s+r.credit,0))}</span><span style="color:#ef4444">חיובים: ${fmt(unmBank.reduce((s,r)=>s+r.debit,0))}</span>`;
   if(el("bank-col-body")){
     if(!unmBank.length) el("bank-col-body").innerHTML=`<div style="color:var(--muted);font-size:12px;text-align:center;padding:20px">✓ כל תנועות הבנק מותאמות</div>`;
-    else el("bank-col-body").innerHTML=unmBank.sort((a,b)=>String(b.date).localeCompare(String(a.date))).map(r=>{
+    else el("bank-col-body").innerHTML=unmBank.sort((a,b)=>(parseDateFlexible(b.date)?.getTime()||0)-(parseDateFlexible(a.date)?.getTime()||0)).map(r=>{
       const isSel=selBank===r.id, isDup=dupBankIds.has(r.id), amt=r.debit||r.credit, isDebit=r.debit>0;
       const suggest=records.find(m=>!m.matched&&Math.abs(m.amount-amt)<1);
       return`<div class="rec-item rec-item-bank${isSel?" selected":""}${isDup?" dup-flag":""}" onclick="selectBankItem('${r.id}')">
@@ -6738,9 +6753,10 @@ function clearCFDateRange(){
   updateLabels(); renderCF();
 }
 function getPK(d,p){
-  const dt=new Date(d); if(isNaN(dt)) return null;
-  if(p==="day") return dt.toISOString().slice(0,10);
-  if(p==="month") return`${dt.getFullYear()}-${String(dt.getMonth()+1).padStart(2,"0")}`;
+  const dt=parseDateFlexible(d); if(!dt) return null;
+  const pad=n=>String(n).padStart(2,"0");
+  if(p==="day") return`${dt.getFullYear()}-${pad(dt.getMonth()+1)}-${pad(dt.getDate())}`;
+  if(p==="month") return`${dt.getFullYear()}-${pad(dt.getMonth()+1)}`;
   const j=new Date(dt.getFullYear(),0,1); const w=Math.ceil(((dt-j)/86400000+j.getDay()+1)/7);
   return`${dt.getFullYear()}-W${String(w).padStart(2,"0")}`;
 }
