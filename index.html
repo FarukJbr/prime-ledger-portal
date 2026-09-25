@@ -2357,6 +2357,11 @@ function switchPortalTab(name,btn){
   if(name==='referral') renderReferralTab();
   if(name==='files'){ currentTaxYear=null; el('files-inside-year').style.display='none'; el('files-year-view').style.display='block'; loadTaxYears(); }
   if(name==='wealth'){ currentWealthYear=null; el('wealth-inside-year').style.display='none'; el('wealth-year-view').style.display='block'; loadWealthYears(); }
+  // BUG FIX: the "צ'קים עתידיים" sidebar tab reaches this function (switchPortalTab), but
+  // populateCheckAccounts()/loadChecks() were only ever wired up in switchAdminSubTab (a
+  // different, admin-only tab switcher) — so the bank-account dropdown here always kept its
+  // hardcoded "-- ללא --" placeholder and never got the client's real accounts (e.g. "4047").
+  if(name==='checks'){ populateCheckAccounts(); loadChecks(); }
 }
 
 // ── LEGAL ──
