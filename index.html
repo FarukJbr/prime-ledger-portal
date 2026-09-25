@@ -702,14 +702,14 @@ h2{font-size:16px;font-weight:800;margin-bottom:4px}
             <div id="dropzone" class="no-print" onclick="document.getElementById('file-input').click()" ondragover="event.preventDefault();this.classList.add('drag')" ondragleave="this.classList.remove('drag')" ondrop="handleDrop(event)">
               <div style="font-size:26px;margin-bottom:7px">📂</div>
               <div style="font-weight:700;margin-bottom:4px">לחץ לבחירת קובץ Excel מהבנק</div>
-              <div style="color:var(--muted);font-size:11px">.xlsx / .xls — עמודות: תאריך, תיאור, חיוב, זיכוי</div>
+              <div style="color:var(--muted);font-size:11px">.xlsx / .xls — עמודות: תאריך, תאריך ערך, תיאור, אסמכתא, בחובה, בזכות, היתרה, הערה</div>
               <input type="file" id="file-input" accept=".xlsx,.xls" style="display:none" onchange="handleFile(this.files[0])">
             </div>
             <div class="card"><div class="sec-title">📁 היסטוריית העלאות</div><div id="upload-history"><div style="color:var(--muted);font-size:12px">טרם הועלו קבצים</div></div></div>
             <div class="card" id="import-result" style="display:none">
               <div class="sec-title"><span id="import-count">תנועות</span><span id="import-matched" style="color:#10b981;font-size:11px"></span></div>
               <div class="tbl-wrap"><table class="tbl">
-                <thead><tr><th>תאריך</th><th>תיאור</th><th>חיוב</th><th>זיכוי</th><th>חשבון</th><th>סטטוס</th></tr></thead>
+                <thead><tr><th>תאריך</th><th>תאריך ערך</th><th>תיאור</th><th>אסמכתא</th><th>חיוב</th><th>זיכוי</th><th>סטטוס</th></tr></thead>
                 <tbody id="import-tbody"></tbody>
               </table></div>
             </div>
@@ -6218,15 +6218,74 @@ function handleFile(file){
 }
 function parseBankData(data,acctId,bp,fileName,fileSize){
   let added=0, dupes=0;
-  for(let i=1;i<data.length;i++){
+
+  // ── Auto-detect column format ──
+  // Format A (standard bank export): date | valueDate | desc | ref | debit | credit | balance | note
+  // Format B (simple): date | desc | debit | credit
+  let fmt='B';
+  for(let i=0;i<Math.min(data.length,8);i++){
+    const r=data[i]; if(!r||r.length<2) continue;
+    const v1=String(r[1]||'').trim();
+    // If col1 looks like a date pattern → Format A
+    if(/^\d{1,2}[\/\-\.]\d{1,2}[\/\-\.]\d{2,4}$/.test(v1)||
+       /^\d{4}[\/\-\.]\d{1,2}[\/\-\.]\d{1,2}$/.test(v1)||
+       /תאריך/.test(v1)){ fmt='A'; break; }
+    // If 6+ columns and col4 or col5 is numeric → Format A
+    if(r.length>=6){
+      const v4=parseFloat(String(r[4]||'').replace(/,/g,''));
+      const v5=parseFloat(String(r[5]||'').replace(/,/g,''));
+      if((!isNaN(v4)&&v4>0)||(!isNaN(v5)&&v5>0)){ fmt='A'; break; }
+    }
+  }
+
+  for(let i=0;i<data.length;i++){
     const r=data[i]; if(!r||r.every(c=>!c)) continue;
-    let date=r[0],desc=r[1],debit=0,credit=0;
-    for(let j=2;j<Math.min(r.length,6);j++){const v=parseFloat(String(r[j]).replace(/,/g,""));if(!isNaN(v)&&v>0){if(j===2)debit=v;else if(j===3)credit=v;}}
+    let date,valueDate='',desc,ref='',debit=0,credit=0;
+
+    if(fmt==='A'){
+      date      = String(r[0]||'').trim();
+      valueDate = String(r[1]||'').trim();
+      desc      = String(r[2]||'').trim();
+      ref       = String(r[3]||'').trim();
+      const d   = parseFloat(String(r[4]||'').replace(/,/g,''));
+      const c   = parseFloat(String(r[5]||'').replace(/,/g,''));
+      if(!isNaN(d)&&d>0) debit=d;
+      if(!isNaN(c)&&c>0) credit=c;
+    } else {
+      date  = String(r[0]||'').trim();
+      desc  = String(r[1]||'').trim();
+      const d=parseFloat(String(r[2]||'').replace(/,/g,''));
+      const c=parseFloat(String(r[3]||'').replace(/,/g,''));
+      if(!isNaN(d)&&d>0) debit=d;
+      if(!isNaN(c)&&c>0) credit=c;
+    }
+
+    // Skip empty / header rows
     if(!desc&&!debit&&!credit) continue;
-    const exist=bankRows.find(b=>b.description.trim()===String(desc||"").trim()&&Math.abs((b.debit||b.credit)-(debit||credit))<0.01&&String(b.date).slice(0,10)===String(date).slice(0,10));
+    if(/תאריך|date|header|עמודה/i.test(desc)) continue;
+    if(!date||/תאריך|date/i.test(String(date))) continue;
+
+    // Deduplicate
+    const exist=bankRows.find(b=>
+      b.description.trim()===desc.trim()&&
+      Math.abs((b.debit||b.credit)-(debit||credit))<0.01&&
+      String(b.date).slice(0,10)===String(date).slice(0,10));
     if(exist){dupes++;continue;}
-    const mI=records.findIndex(m=>!m.matched&&Math.abs(m.amount-(debit||credit))<0.5&&m.description.trim()===String(desc||"").trim());
-    const row={id:"bank-"+Date.now()+"-"+i,acctId:acctId||null,date,description:String(desc||""),debit,credit,matched:mI>=0,manualEntryId:mI>=0?records[mI].id:null,bp:bp||"biz"};
+
+    // Auto-match
+    const mI=records.findIndex(m=>!m.matched&&
+      Math.abs(m.amount-(debit||credit))<0.5&&
+      m.description.trim()===desc.trim());
+
+    const row={
+      id:'bank-'+Date.now()+'-'+i,
+      acctId:acctId||null,
+      date, valueDate, description:desc, ref,
+      debit, credit,
+      matched:mI>=0,
+      manualEntryId:mI>=0?records[mI].id:null,
+      bp:bp||'biz'
+    };
     if(mI>=0){records[mI].matched=true;records[mI].bankRowId=row.id;}
     bankRows.push(row); added++;
   }
@@ -6235,11 +6294,13 @@ function parseBankData(data,acctId,bp,fileName,fileSize){
   if(el("import-count")) el("import-count").textContent=`יובאו ${added} תנועות${dupes?` · ${dupes} כפולות דולגו`:""}`;
   if(el("import-matched")) el("import-matched").textContent=" · "+bankRows.filter(r=>r.matched).length+" מותאמות";
   if(el("import-tbody")) el("import-tbody").innerHTML=bankRows.slice(-60).map(r=>`<tr>
-    <td>${fmtD(r.date)}</td><td>${r.description}</td>
-    <td style="color:#ef4444;font-weight:600">${r.debit>0?fmt(r.debit):""}</td>
-    <td style="color:#10b981;font-weight:600">${r.credit>0?fmt(r.credit):""}</td>
-    <td>${r.acctId?`<span style="color:${aC(r.acctId)}">●</span> ${aN(r.acctId)}`:"—"}</td>
-    <td>${r.matched?`<span class="badge bg">✓</span>`:`<span class="badge by">ממתין</span>`}</td>
+    <td>${fmtD(r.date)}</td>
+    <td style="font-size:11px;color:var(--muted)">${r.valueDate&&r.valueDate!==r.date?fmtD(r.valueDate):''}</td>
+    <td>${r.description}${r.ref?`<br><span style="font-size:10px;color:var(--muted)">אסמכתא: ${r.ref}</span>`:''}</td>
+    <td style="font-size:11px;color:var(--muted)">${r.ref||''}</td>
+    <td style="color:#ef4444;font-weight:600">${r.debit>0?fmt(r.debit):''}</td>
+    <td style="color:#10b981;font-weight:600">${r.credit>0?fmt(r.credit):''}</td>
+    <td>${r.matched?`<span class="badge bg">✓ מותאם</span>`:`<span class="badge by">ממתין</span>`}</td>
   </tr>`).join("");
   renderUploadHistory(); save(); refreshAll(); showDupBanner();
 }
