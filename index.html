@@ -6757,12 +6757,21 @@ function getPK(d,p){
   const pad=n=>String(n).padStart(2,"0");
   if(p==="day") return`${dt.getFullYear()}-${pad(dt.getMonth()+1)}-${pad(dt.getDate())}`;
   if(p==="month") return`${dt.getFullYear()}-${pad(dt.getMonth()+1)}`;
-  const j=new Date(dt.getFullYear(),0,1); const w=Math.ceil(((dt-j)/86400000+j.getDay()+1)/7);
-  return`${dt.getFullYear()}-W${String(w).padStart(2,"0")}`;
+  // week: key by the Sunday that starts this date's calendar week, so the label below can show
+  // a real date range (e.g. "21/09-27/09") instead of an arbitrary week number — much more
+  // readable than "שב' 39/2026". Zero-padded, so it still sorts correctly as plain text.
+  const sunday=new Date(dt); sunday.setDate(dt.getDate()-dt.getDay());
+  return`W-${sunday.getFullYear()}-${pad(sunday.getMonth()+1)}-${pad(sunday.getDate())}`;
 }
 function getPL(k,p){
   if(p==="day"){ const [y,m,d]=k.split("-"); return `${d}/${m}`; }
-  if(p==="month"){const[y,m]=k.split("-");return`${MONTHS[parseInt(m)-1]} ${y}`;} const[y,w]=k.split("-W");return`שב' ${w}/${y}`;}
+  if(p==="month"){const[y,m]=k.split("-");return`${MONTHS[parseInt(m)-1]} ${y}`;}
+  // week: k = "W-YYYY-MM-DD" (that week's Sunday) -> show the full date range
+  const[,y,m,d]=k.split("-");
+  const pad=n=>String(n).padStart(2,"0");
+  const start=new Date(+y,+m-1,+d), end=new Date(start); end.setDate(start.getDate()+6);
+  return`${pad(start.getDate())}/${pad(start.getMonth()+1)}-${pad(end.getDate())}/${pad(end.getMonth()+1)}`;
+}
 let showForecast = false;
 function toggleForecast(){
   showForecast = !showForecast;
