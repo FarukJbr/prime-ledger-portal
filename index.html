@@ -631,6 +631,10 @@ h2{font-size:16px;font-weight:800;margin-bottom:4px}
               <div class="sec-title" style="color:#ef4444">⚠️ התראות מסגרת אשראי</div>
               <div id="limit-warnings-list"></div>
             </div>
+            <div id="fx-rates-card" class="card" style="display:none">
+              <div class="sec-title">💱 שערי מטבע (בנק ישראל)</div>
+              <div id="fx-rates-list" style="display:flex;gap:18px;flex-wrap:wrap;font-size:13px"></div>
+            </div>
             <div class="acct-bar" id="dash-acct-bar"><span style="color:var(--muted);font-size:12px" class="no-print">חשבון:</span><button class="acct-chip all active" onclick="setDashAcct('all',this)">הכל</button></div>
             <div class="inner-tabs no-print" id="dash-view-tabs">
               <button class="itab active" onclick="setDashView('all',this)">הכל</button>
@@ -770,14 +774,16 @@ h2{font-size:16px;font-weight:800;margin-bottom:4px}
                 </div>
               </div>
               <div class="form-grid" style="grid-template-columns:1fr 1fr">
-                <div><div class="form-label">תאריך עסקה</div><input type="date" id="r-date"></div>
+                <div><div class="form-label">תאריך עסקה</div><input type="date" id="r-date" onchange="updateFxPreview()"></div>
                 <div><div class="form-label">חשבון</div><select id="r-acct"><option value="">-- ללא --</option></select></div>
               </div>
               <div class="form-grid"><div><div class="form-label">תיאור</div><input type="text" id="r-desc" placeholder="תיאור הפעולה"></div></div>
-              <div class="form-grid" style="grid-template-columns:1fr 1fr">
-                <div><div class="form-label">סכום (₪)</div><input type="number" id="r-amount" placeholder="0.00"></div>
+              <div class="form-grid" style="grid-template-columns:1fr 1fr 1fr">
+                <div><div class="form-label">סכום</div><input type="number" id="r-amount" placeholder="0.00" oninput="updateFxPreview()"></div>
+                <div><div class="form-label">מטבע</div><select id="r-currency" onchange="updateFxPreview()"><option value="ILS">₪ שקל</option><option value="USD">$ דולר</option><option value="EUR">€ יורו</option></select></div>
                 <div><div class="form-label">קטגוריה</div><select id="r-cat"></select></div>
               </div>
+              <div id="fx-preview" style="font-size:11px;color:var(--muted);margin:-4px 0 8px 0"></div>
               <button class="btn-solid" id="add-record-btn" onclick="addRecord()" style="width:100%;margin-top:4px">+ הוסף רישום</button>
             </div>
             <div class="card no-print" style="padding:10px 14px">
@@ -4795,7 +4801,7 @@ async function saveUserData(){
       p_email: email,
       p_accounts: accounts.map(a=>({id:a.id,name:a.name||'',type:a.type||'bank',opening:a.opening||0,limit:a.limit||0,color:a.color||'#3b82f6'})),
       p_bank_rows: bankRows.map(r=>({id:r.id,acctId:r.acctId||null,date:r.date instanceof Date?r.date.toISOString():String(r.date||''),description:r.description||'',debit:r.debit||0,credit:r.credit||0,matched:!!r.matched,manualEntryId:r.manualEntryId||null,bp:r.bp||'biz'})),
-      p_records: manualRecords.map(r=>({id:r.id,date:String(r.date||''),description:r.description||'',amount:r.amount||0,type:r.type,bp:r.bp||'biz',category:r.category||'',acctId:r.acctId||null,matched:!!r.matched,bankRowId:r.bankRowId||null}))
+      p_records: manualRecords.map(r=>({id:r.id,date:String(r.date||''),description:r.description||'',amount:r.amount||0,type:r.type,bp:r.bp||'biz',category:r.category||'',acctId:r.acctId||null,matched:!!r.matched,bankRowId:r.bankRowId||null,currency:r.currency||'ILS',originalAmount:(r.originalAmount!=null?r.originalAmount:null),fxRate:r.fxRate||1}))
     });
     // Local backup snapshot — a safety net for loadUserData(): if a refresh
     // happens to land mid-sync anyway (e.g. a slow connection), this lets the
@@ -4849,7 +4855,7 @@ async function loadUserData(){
     ]);
     accounts = (accD||[]).map(a=>({id:a.id,name:a.name,type:a.type,opening:Number(a.opening)||0,limit:Number(a.credit_limit)||0,color:a.color}));
     bankRows = (bankD||[]).map(r=>({id:r.id,acctId:r.acct_id,date:r.row_date,description:r.description,debit:Number(r.debit)||0,credit:Number(r.credit)||0,matched:!!r.matched,manualEntryId:r.manual_entry_id,bp:r.bp}));
-    records = (recD||[]).map(r=>({id:r.id,date:r.record_date,description:r.description,amount:Number(r.amount)||0,type:r.type,bp:r.bp,category:r.category,acctId:r.acct_id,matched:!!r.matched,bankRowId:r.bank_row_id,recurringItemId:r.recurring_item_id,loanId:r.loan_id}));
+    records = (recD||[]).map(r=>({id:r.id,date:r.record_date,description:r.description,amount:Number(r.amount)||0,type:r.type,bp:r.bp,category:r.category,acctId:r.acct_id,matched:!!r.matched,bankRowId:r.bank_row_id,recurringItemId:r.recurring_item_id,loanId:r.loan_id,currency:r.currency||'ILS',originalAmount:r.original_amount!=null?Number(r.original_amount):null,fxRate:Number(r.fx_rate)||1}));
     clientName = userD?.display_name || '';
     uploadHistory = userD?.upload_history || [];
     userLogoCache = userD?.logo_data || null;
@@ -6319,6 +6325,52 @@ function setDashView(v,btn){dashView=v;document.querySelectorAll("#tab-dashboard
 function setDashPeriod(v,btn){dashPeriod=v;document.querySelectorAll("#tab-dashboard .period-btn").forEach(b=>b.classList.remove("active"));btn.classList.add("active");if(el("dash-period-lbl"))el("dash-period-lbl").textContent=v==="week"?"שבועי":"חודשי";refreshDashboard();}
 
 // ── RECORDS ──
+// ── MULTI-CURRENCY / FX RATES ──
+const fxRateCache = {}; // key: "USD|2026-09-25" -> rate (₪ per 1 unit)
+let fxWidgetLoaded = false;
+async function getFxRateFor(currency, dateStr){
+  if(!currency || currency==='ILS') return 1;
+  const d = (dateStr||'').slice(0,10) || new Date().toISOString().slice(0,10);
+  const key = currency+'|'+d;
+  if(fxRateCache[key] != null) return fxRateCache[key];
+  if(!sb) return 1;
+  try{
+    const {data,error} = await sb.rpc('get_fx_rate',{p_currency:currency,p_date:d});
+    if(error) throw error;
+    const rate = Number(data)||1;
+    fxRateCache[key] = rate;
+    return rate;
+  }catch(e){ console.error('get_fx_rate error',e); return 1; }
+}
+async function updateFxPreview(){
+  const box = el('fx-preview'); if(!box) return;
+  const cur = el('r-currency')?el('r-currency').value:'ILS';
+  const amtRaw = el('r-amount')?parseFloat(el('r-amount').value):NaN;
+  const dateStr = el('r-date')?el('r-date').value:'';
+  if(cur==='ILS' || isNaN(amtRaw)){ box.textContent=''; return; }
+  const rate = await getFxRateFor(cur, dateStr);
+  const symbol = cur==='USD'?'$':(cur==='EUR'?'€':cur);
+  box.textContent = `1 ${symbol} = ${rate.toFixed(4)} ₪  →  סה"כ: ${fmt(Math.round(amtRaw*rate*100)/100)} (לפי שער ${dateStr||'היום'})`;
+}
+async function loadFxRatesWidget(){
+  if(!sb) return;
+  try{
+    const {data,error} = await sb.from('fx_rates').select('*').order('rate_date',{ascending:false}).limit(30);
+    if(error || !data || !data.length) return;
+    const latestDate = data[0].rate_date;
+    const rows = data.filter(r=>r.rate_date===latestDate);
+    const show = ['USD','EUR','GBP'];
+    const labels = {USD:'$ דולר',EUR:'€ יורו',GBP:'£ ליש"ט'};
+    const items = show.map(c=>rows.find(r=>r.currency===c)).filter(Boolean);
+    if(!items.length) return;
+    const card = el('fx-rates-card'), list = el('fx-rates-list');
+    if(!card || !list) return;
+    list.innerHTML = items.map(r=>`<div><span style="color:var(--muted)">${labels[r.currency]||r.currency}:</span> <strong>${Number(r.rate).toFixed(4)} ₪</strong></div>`).join('')
+      + `<div style="color:var(--muted);font-size:11px">מעודכן ${new Date(latestDate).toLocaleDateString('he-IL')}</div>`;
+    card.style.display = 'block';
+    fxWidgetLoaded = true;
+  }catch(e){ console.error('loadFxRatesWidget error', e); }
+}
 async function addRecord(){
   const plan = PLANS[currentUser?.plan||'free']||PLANS.free;
   // Monthly limit: count only records added THIS calendar month (created_at field).
@@ -6336,20 +6388,32 @@ async function addRecord(){
       return;
     }
   }
-  const desc=el("r-desc").value.trim(), amount=parseFloat(el("r-amount").value);
-  if(!desc||isNaN(amount)||amount<=0){alert("נא למלא תיאור וסכום");return;}
-  const exactDup=records.find(r=>r.description.trim().toLowerCase()===desc.toLowerCase()&&Math.abs(r.amount-amount)<0.01&&r.date===el("r-date").value&&r.type===recordType&&r.bp===recordBP);
+  const desc=el("r-desc").value.trim(), enteredAmount=parseFloat(el("r-amount").value);
+  const currency = el("r-currency")?el("r-currency").value:'ILS';
+  const recDate = el("r-date").value||new Date().toISOString().slice(0,10);
+  if(!desc||isNaN(enteredAmount)||enteredAmount<=0){alert("נא למלא תיאור וסכום");return;}
+  // For a foreign-currency entry, the ILS-equivalent (the value used everywhere
+  // downstream — dashboard, cashflow, reconciliation, exports) is computed from
+  // the exchange rate as of the transaction date, per the client's request.
+  let fxRate = 1, originalAmount = null;
+  if(currency !== 'ILS'){
+    fxRate = await getFxRateFor(currency, recDate);
+    originalAmount = enteredAmount;
+  }
+  const amount = currency==='ILS' ? enteredAmount : Math.round(enteredAmount*fxRate*100)/100;
+  const exactDup=records.find(r=>r.description.trim().toLowerCase()===desc.toLowerCase()&&Math.abs(r.amount-amount)<0.01&&r.date===recDate&&r.type===recordType&&r.bp===recordBP);
   if(exactDup){alert(`⚠️ כפילות!\n\nקיים רישום זהה:\n"${exactDup.description}"\nסכום: ${fmt(exactDup.amount)}\nתאריך: ${exactDup.date}\n\nהרישום לא נוסף.`);return;}
   const similar=records.find(r=>r.description.trim().toLowerCase()===desc.toLowerCase()&&Math.abs(r.amount-amount)<0.01&&r.type===recordType);
   if(similar&&!confirm(`💡 רישום דומה קיים:\n"${similar.description}"\nסכום: ${fmt(similar.amount)}\nתאריך: ${similar.date}\n\nהאם להוסיף בכל זאת?`)) return;
   records.push({
     id:"r-"+Date.now(),
-    date:el("r-date").value||new Date().toISOString().slice(0,10),
+    date:recDate,
     created_at: new Date().toISOString(),   // תאריך הוספה — מוגדר אוטומטית, לא ניתן לשינוי
     description:desc, amount, type:recordType, bp:recordBP,
-    category:el("r-cat").value, acctId:el("r-acct").value||null, matched:false
+    category:el("r-cat").value, acctId:el("r-acct").value||null, matched:false,
+    currency, originalAmount, fxRate
   });
-  el("r-desc").value=""; el("r-amount").value="";
+  el("r-desc").value=""; el("r-amount").value=""; if(el("r-currency")) el("r-currency").value='ILS'; if(el('fx-preview')) el('fx-preview').textContent='';
   writeLocalBackup();
   refreshAll();
   const btn = el('add-record-btn');
@@ -6403,7 +6467,7 @@ function renderRecords(){
     <td><span class="badge ${r.type==="הוצאה"?"br":"bg"}">${r.type}</span></td>
     <td><span class="badge ${r.bp==="biz"?"bb":"bp"}">${r.bp==="biz"?"🏢":"🏠"}</span></td>
     <td>${r.acctId?`<span style="color:${aC(r.acctId)};font-size:11px">●</span> ${aN(r.acctId)}`:"—"}</td>
-    <td style="color:${r.type==="הוצאה"?"#ef4444":"#10b981"};font-weight:700">${r.type==="הוצאה"?"-":"+"}${fmt(r.amount)}</td>
+    <td style="color:${r.type==="הוצאה"?"#ef4444":"#10b981"};font-weight:700">${r.type==="הוצאה"?"-":"+"}${fmt(r.amount)}${(r.currency&&r.currency!=='ILS')?`<div style="font-size:10px;font-weight:400;color:var(--muted)">(${r.currency==='USD'?'$':r.currency==='EUR'?'€':r.currency}${r.originalAmount!=null?r.originalAmount:''} × ${(r.fxRate||1).toFixed(4)})</div>`:""}</td>
     <td>${r.matched?`<span class="badge bg">✓ מותאם</span>`:`<span class="badge by">ממתין</span>`}</td>
     <td class="no-print"><button class="btn btn-red btn-sm" onclick="deleteRecord('${r.id}')">מחק</button></td>
   </tr>`;}).join("");
@@ -7012,6 +7076,7 @@ function refreshAll(){
   if(typeof renderHealthScore==='function') renderHealthScore();
   syncRecurringAcctSelect(); renderRecurringItems();
   syncLoanAcctSelect(); renderLoans();
+  if(!fxWidgetLoaded) loadFxRatesWidget();
 }
 
 // ── INIT ──
